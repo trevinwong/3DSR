@@ -2,7 +2,7 @@
 cmake_minimum_required (VERSION 3.1)
 project (3DSR)
 
-# Set C++14.
+# Set C++17.
 if (POLICY CMP0025)
  cmake_policy(SET CMP0025 NEW)
 endif ()
@@ -12,9 +12,12 @@ set(SOURCE_FILES
   src/main.cpp
 )
 
-# Add the executable.
+# Add the executable, which should be built from the given source (.cpp) files.
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
+
+# Directories to look in when building the executable.
 target_include_directories(${PROJECT_NAME} PUBLIC src/)
+target_include_directories(${PROJECT_NAME} PUBLIC lib/)
 
 # Find SDL2 and link it in.
 find_package(PkgConfig REQUIRED)
