@@ -43,8 +43,8 @@ To run the project, all you need to do is type `./3DSR` in the `build` folder.
 Fun fact: you don't need to specify the exact path of where the header lives, as long as the directory is included using `target_include_directories` in your `CMakeLists.txt`.
 
 3. ~~Create a window in **SDL2**.~~
-4. Figure out how to write to a buffer.
-5. Figure out how to display said buffer using **SDL2**.
+4. ~~Figure out how to write to a buffer.~~
+5. ~~Figure out how to display said buffer using **SDL2**.~~
 6. Create a basic vector class.
 7. Create a basic matrix class.
 8. Load `.obj` files.
