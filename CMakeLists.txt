@@ -10,12 +10,13 @@ set (CMAKE_CXX_STANDARD 17)
 
 set(SOURCE_FILES
   src/main.cpp
+  src/frame.cpp
 )
 
 # Add the executable, which should be built from the given source (.cpp) files.
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 
-# Directories to look in when building the executable.
+# Directories to look in for includes when building the executable.
 target_include_directories(${PROJECT_NAME} PUBLIC src/)
 target_include_directories(${PROJECT_NAME} PUBLIC lib/)
 

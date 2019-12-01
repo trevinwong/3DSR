@@ -5,6 +5,8 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
 
+#include "frame.h"
+
 const inline int WINDOW_WIDTH = 640;
 const inline int WINDOW_HEIGHT = 480;
 
@@ -34,13 +36,14 @@ int main() {
                         SDL_TEXTUREACCESS_STREAMING,
                         WINDOW_WIDTH, WINDOW_HEIGHT);
     
-    // Allocate a buffer to draw to.
-    uint32_t* frame_buffer = new uint32_t[(WINDOW_WIDTH * WINDOW_HEIGHT) * sizeof(uint32_t)];
-
-    // Test if this works by setting all pixels to red.
-    for (int i = 0; i < (WINDOW_WIDTH * WINDOW_HEIGHT); i++)
+    // Create a Frame object, which allocates a buffer to draw to, and set all its pixels to red.
+    Frame frame(WINDOW_WIDTH, WINDOW_HEIGHT);
+    for (int i = 0; i < WINDOW_WIDTH; i++)
     {
-        frame_buffer[i] = 0xffff0000;
+        for (int j = 0; j < WINDOW_HEIGHT; j++)
+        {
+            frame.set_pixel(i, j, 0xffff0000);
+        }
     }
 
     // Load our object.
@@ -110,7 +113,7 @@ int main() {
 
         // Replace the screen with our frame buffer.
         // The last argument is the number of bytes between one row and the next.
-        SDL_UpdateTexture(screen, NULL, frame_buffer, WINDOW_WIDTH * sizeof(uint32_t));
+        SDL_UpdateTexture(screen, NULL, frame.buffer, WINDOW_WIDTH * sizeof(uint32_t));
 
         // Render.
         SDL_RenderClear(renderer);
@@ -118,7 +121,6 @@ int main() {
         SDL_RenderPresent(renderer);
     }
 
-    delete[] frame_buffer;
     SDL_DestroyWindow(window);
     SDL_Quit();
     return 0;

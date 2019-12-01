@@ -72,7 +72,6 @@ Fun fact: you don't need to specify the exact path of where the header lives, as
 ## House-keeping
 
 - Look into making a separate `vec3` class. Inadvertently performing calculations on `w` is weird with `vec4`.
-- Look into separating out the frame buffer (i.e memory allocation, pixel setting) into a separate class.
 - Look into separating out loading the mesh and storing its data into a separate class.
 
 ## References
