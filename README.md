@@ -45,14 +45,36 @@ Fun fact: you don't need to specify the exact path of where the header lives, as
 3. ~~Create a window in **SDL2**.~~
 4. ~~Figure out how to write to a buffer.~~
 5. ~~Figure out how to display said buffer using **SDL2**.~~
-6. Create a basic vector class.
-7. Create a basic matrix class.
+6. ~~Create a basic vector class.~~
+7. ~~Create a basic matrix class.~~
 8. Load `.obj` files.
 
 ### Primitive Assembly
-7. Draw line segments.
-8. Render wireframes of meshes.
-9. Draw triangles.
+9. Figure out how to read the `.obj` format.
+10. Draw line segments using Bresenham's line algorithm.
+11. Render the wireframe of the mesh.
+12. Draw filled triangles.
+13. Render the mesh using triangle rasterization.
+
+### Visibility
+
+14. Setting up a camera and perspective projection.
+15. Moving the camera.
+16. Frustum culling.
+17. Back-face culling.
+
+### Shaders and Light
+
+18. Setting up a basic fragment shaders. Flat shading.
+19. Adding a light to the scene.
+20. Gouraud shading.
+21. Phong shading.
+22. Texture mapping.
+
+## House-keeping
+
+- Look into making a separate `vec3` class.
+- Look into separating out the frame buffer (i.e memory allocation, pixel setting) into a separate class.
 
 ## References
 
