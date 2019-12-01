@@ -27,5 +27,9 @@ if (NOT SDL2_FOUND)
   message(FATAL_ERROR "Can't find SDL." )
 endif()
 
+# Copies over our /obj directory where the project is actually built so it can find the appropriate paths.
+# Inspired by JamesGriffin/3D-Rasterizer.
+file(COPY obj/ DESTINATION "${PROJECT_BINARY_DIR}/obj")
+
 target_include_directories(${PROJECT_NAME} PUBLIC ${SDL2_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} PUBLIC ${SDL2_LIBRARIES})

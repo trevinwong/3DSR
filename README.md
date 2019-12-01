@@ -47,14 +47,12 @@ Fun fact: you don't need to specify the exact path of where the header lives, as
 5. ~~Figure out how to display said buffer using **SDL2**.~~
 6. ~~Create a basic vector class.~~
 7. ~~Create a basic matrix class.~~
-8. Load `.obj` files.
+8. ~~Load `.obj` files.~~
 
 ### Primitive Assembly
-9. Figure out how to read the `.obj` format.
-10. Draw line segments using Bresenham's line algorithm.
-11. Render the wireframe of the mesh.
+9.  Run through `tinyobjloader` returned file format, and act upon vertices (Step 10 and onwards).
+10. Draw line segments into the buffer, using Bresenham's line algorithm.
 12. Draw filled triangles.
-13. Render the mesh using triangle rasterization.
 
 ### Visibility
 
@@ -65,7 +63,7 @@ Fun fact: you don't need to specify the exact path of where the header lives, as
 
 ### Shaders and Light
 
-18. Setting up a basic fragment shaders. Flat shading.
+18. Setting up basic fragment shaders.
 19. Adding a light to the scene.
 20. Gouraud shading.
 21. Phong shading.
@@ -73,8 +71,9 @@ Fun fact: you don't need to specify the exact path of where the header lives, as
 
 ## House-keeping
 
-- Look into making a separate `vec3` class.
+- Look into making a separate `vec3` class. Inadvertently performing calculations on `w` is weird with `vec4`.
 - Look into separating out the frame buffer (i.e memory allocation, pixel setting) into a separate class.
+- Look into separating out loading the mesh and storing its data into a separate class.
 
 ## References
 
