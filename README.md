@@ -50,8 +50,8 @@ Fun fact: you don't need to specify the exact path of where the header lives, as
 8. ~~Load `.obj` files.~~
 
 ### Primitive Assembly
-9.  Run through `tinyobjloader` returned file format, and act upon vertices (Step 10 and onwards).
-10. Draw line segments into the buffer, using Bresenham's line algorithm.
+9.  ~~Run through `tinyobjloader` returned file format, and act upon vertices (Step 10 and onwards).~~
+10. ~~Draw line segments into the buffer, using Bresenham's line algorithm.~~
 12. Draw filled triangles.
 
 ### Visibility
