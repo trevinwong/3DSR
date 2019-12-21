@@ -49,6 +49,14 @@ void Frame::set_pixel(int x, int y, uint32_t color)
     *ptr = color;
 }
 
+void Frame::flip_image_on_x_axis()
+{
+    for (int i = 0; i < (w/2)*h; i++)
+    {
+        std::swap(buffer[i], buffer[(w*h)-1-i]);
+    }
+}
+
 void Frame::copy(const Frame& other)
 {
     buffer = new uint32_t[(other.w * other.h) * sizeof(uint32_t)];

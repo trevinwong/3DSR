@@ -52,27 +52,36 @@ Fun fact: you don't need to specify the exact path of where the header lives, as
 ### Primitive Assembly
 9.  ~~Run through `tinyobjloader` returned file format, and act upon vertices (Step 10 and onwards).~~
 10. ~~Draw line segments into the buffer, using Bresenham's line algorithm.~~
-12. Draw filled triangles.
+12. ~~Draw filled triangles using a basic rasterization algorithm.~~
 
 ### Visibility
 
-14. Setting up a camera and perspective projection.
-15. Moving the camera.
+13. Occlusion culling using a z-buffer.
+14. Setting up an actual camera and perspective projection. Proper handling of coordinates, including conversion to camera coordinates, to screen coordinates.
+15. Back-face culling.
 16. Frustum culling.
-17. Back-face culling.
+17. Moving the camera.
 
 ### Shaders and Light
 
 18. Setting up basic fragment shaders.
-19. Adding a light to the scene.
-20. Gouraud shading.
-21. Phong shading.
-22. Texture mapping.
+19. Gouraud shading.
+20. Phong shading.
+21. Texture mapping.
+22. Shadows.
 
 ## House-keeping
 
-- Look into making a separate `vec3` class. Inadvertently performing calculations on `w` is weird with `vec4`.
+- ~~Look into making a separate `vec3` class. Inadvertently performing calculations on `w` is weird with `vec4`.~~
+- Make vector API nicer. Add more QoL functions to other vec2 and vec4 classes (i.e normalize, magnitude, etc.). Possibly add stuff like swizzling.
+- Look into why using `vec2` with floats instead of integers causes gaps between triangles. (may have to do with weird rounding for bounding boxes)
+- Possibly abstract out `SDL_MakeRGBA` into a color class.
+- Possibly abstract out renderer (i.e `draw_line`, `draw_triangle`)
 - Look into separating out loading the mesh and storing its data into a separate class.
+
+## Lessons
+
+- Be wary of where your cross product vector points. Place your thumb in the direction of the first vector and your index finger in the direction of the second vector. Your middle finger should be perpendicular and show the direction of the cross product vector. Remember to do this with the appropriate handedness of your coordinate system (left-hand/right-hand).
 
 ## References
 
@@ -85,3 +94,7 @@ There are a few other projects that have done the same thing, and that I have us
 For learning SDL2, this website has been very handy:
 
 - http://lazyfoo.net/tutorials/SDL/index.php
+
+For a deeper overview into the basic rasterization algorithm:
+
+- https://fgiesen.wordpress.com/2013/02/08/triangle-rasterization-in-practice/

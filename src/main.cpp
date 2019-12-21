@@ -1,16 +1,23 @@
 #include <iostream>
 #include <utility>
 #include <cmath>
+#include <iomanip>
+#include <cstdint>
+
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "../lib/tiny_obj_loader.h"
+
+#include "vec2.h"
+#include "vec3.h"
+#include "frame.h"
+
+#define trace(var)  { std::cout << "Line " << __LINE__ << ": " << #var << "=" << var << "\n";}
 
 #include "SDL.h"
 
-#define TINYOBJLOADER_IMPLEMENTATION
-#include "tiny_obj_loader.h"
-
-#include "frame.h"
-
-const inline int WINDOW_WIDTH = 640;
-const inline int WINDOW_HEIGHT = 480;
+const inline int WINDOW_WIDTH = 800;
+const inline int WINDOW_HEIGHT = 800;
+const inline SDL_PixelFormat* pixel_format;
 
 bool quit = false;
 
@@ -43,8 +50,7 @@ void draw_line(int x0, int y0, int x1, int y1, Frame& frame)
             frame.set_pixel(y, x, 0xffff0000);
         } else
         {
-            frame.set_pixel(x, y, 0xffff0000);
-        }
+            frame.set_pixel(x, y, 0xffff0000); }
         if (P < 0)
         {
             P = P + 2*dy;
@@ -66,6 +72,68 @@ void draw_line(int x0, int y0, int x1, int y1, Frame& frame)
         } else
         {
             ++x;
+        }
+    }
+}
+
+// Given the edge v0, calculate the value of the edge function with input v1, which is the vector to the point we are testing.
+int orientation_wrt_edge(vec2& edge, vec2& to_point)
+{
+    return (edge.x * to_point.y) - (edge.y * to_point.x);
+}
+
+int min3(int a, int b, int c)
+{
+    return std::min(std::min(a, b), c);
+}
+
+int max3(int a, int b, int c)
+{
+    return std::max(std::max(a, b), c);
+}
+
+void print_hex(uint32_t num)
+{
+    std::cout << std::setfill('0') << std::setw(8) << std::hex << num << '\n';
+}
+
+// We use vec2 to represent our 2d points.
+// Assume p0, p1 and p2 are listed in CCW order, and we're using a right-hand coordinate system.
+void draw_triangle(vec2& p0, vec2& p1, vec2& p2, Frame& frame, uint32_t color)
+{
+    vec2 edge0 = (p1 - p0);
+    vec2 edge1 = (p2 - p1);
+    vec2 edge2 = (p0 - p2);
+
+    // Get the bounding box of these points.
+    int min_x = min3(p0.x, p1.x, p2.x);
+    int max_x = max3(p0.x, p1.x, p2.x);
+    int min_y = min3(p0.y, p1.y, p2.y);
+    int max_y = max3(p0.y, p1.y, p2.y);
+
+    // Clip against the screen.
+    min_x = std::max(min_x, 0);
+    max_x = std::min(max_x, frame.w - 1);
+    min_y = std::max(min_y, 0);
+    max_y = std::min(max_y, frame.h - 1);
+
+    // Iterate through all pixels inside the bounding box.
+    for (int i = min_x; i < max_x; i++)
+    {
+        for (int j = min_y; j < max_y; j++)
+        {
+            vec2 to_point_from_p0 = vec2(i, j) - p0;
+            vec2 to_point_from_p1 = vec2(i, j) - p1;
+            vec2 to_point_from_p2 = vec2(i, j) - p2;
+
+            int orient0 = orientation_wrt_edge(edge0, to_point_from_p0); 
+            int orient1 = orientation_wrt_edge(edge1, to_point_from_p1); 
+            int orient2 = orientation_wrt_edge(edge2, to_point_from_p2); 
+
+            if (orient0 >= 0 && orient1 >= 0 && orient2 >= 0)
+            {
+                frame.set_pixel(i, j, color);
+            }
         }
     }
 }
@@ -93,6 +161,7 @@ int main() {
                         SDL_PIXELFORMAT_ARGB8888,
                         SDL_TEXTUREACCESS_STREAMING,
                         WINDOW_WIDTH, WINDOW_HEIGHT);
+    pixel_format = SDL_AllocFormat(SDL_PIXELFORMAT_ARGB8888);
     
     // Create a Frame object, which allocates a buffer to draw to.
     Frame frame(WINDOW_WIDTH, WINDOW_HEIGHT);
@@ -116,9 +185,16 @@ int main() {
     draw_line(200, 200, 150, 300, frame);
     */
 
+    /*
+    vec2 v0(200, 200);
+    vec2 v1(400, 200);
+    vec2 v2(300, 300);
+    draw_triangle(v0, v1, v2, frame);
+    */
+
     // Load our object.
     // monkey_flat.obj only specifies vertices, normals and faces.
-    std::string inputfile = "obj/monkey_flat.obj";
+    std::string inputfile = "obj/african_head.obj";
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
@@ -136,7 +212,10 @@ int main() {
       exit(1);
     }
 
-    // Time to draw the mesh. It's upside down b/c right now our coordinate system is reflected across the x-axis due to the way the buffer is set-up.
+    // "Create" a light, in world coords.
+    vec3 light_dir(0, 0, 1);
+
+    // Time to draw the mesh.
     // For each shape...
     for (size_t s = 0; s < shapes.size(); s++)
     {
@@ -146,7 +225,12 @@ int main() {
         {
             // Find the number of vertices that describes it. 
             int num_vertices = shapes[s].mesh.num_face_vertices[f];
+
+            std::vector<vec3> world_coords;
+            std::vector<vec2> screen_coords;
+            std::vector<vec3> normals;
             
+            // All vertices are stored in counter-clockwise order by default.
             for (size_t v = 0; v < num_vertices; v++)
             {
                 // Fetch the index of the 1st/2nd/3rd... etc. vertex
@@ -165,17 +249,35 @@ int main() {
                 tinyobj::real_t next_vy = attrib.vertices[3*next_idx.vertex_index + 1];
                 tinyobj::real_t next_vz = attrib.vertices[3*next_idx.vertex_index + 2];
 
+                world_coords.push_back(vec3(vx, vy, vz));
+                screen_coords.push_back(vec2((int) ((vx+1)*frame.w/2), (int)((vy+1)*frame.h/2)));
+
                 // We draw a line between this vertex and the next vertex.
-                // Note that all vertices are normalized. We add +1 to make sure all our coordinates are positive, and then shift it to w/2 and h/2.
-                // This is b/c we have no projection, but we just want to test the rendering.
+                // Note that all vertices are normalized, and in "world coordinates".
+                // We scale it to screen coordinates and do what seems like "orthogonal projection" by completely ignoring z.
                 // Inspired by tinyrenderer.
-                draw_line((vx+1)*frame.w/2, (vy+1)*frame.h/2, (next_vx+1)*frame.w/2, (next_vy+1)*frame.h/2, frame);
+                // draw_line((vx+1)*frame.w/2, (vy+1)*frame.h/2, (next_vx+1)*frame.w/2, (next_vy+1)*frame.h/2, frame);
 
                 // We can obtain the vertex index by calling idx.normal_index.
                 // All normals are listed in a linear array, so our stride is 3 (x,y,z)
                 tinyobj::real_t nx = attrib.vertices[3*idx.normal_index + 0];
                 tinyobj::real_t ny = attrib.vertices[3*idx.normal_index + 1];
                 tinyobj::real_t nz = attrib.vertices[3*idx.normal_index + 2];
+
+                normals.push_back(vec3(nx, ny, nz));
+            }
+
+            // draw_triangle(screen_coords[0], screen_coords[1], screen_coords[2], frame, SDL_MapRGBA(pixel_format, rand()%255, rand()%255, rand()%255, 255));
+
+            // The normals are given to us, but let's calculate them for fun.
+            // vec3 normal = cross(world_coords[2] - world_coords[0], world_coords[1] - world_coords[0]);
+            vec3 normal = cross(world_coords[1] - world_coords[0], world_coords[2] - world_coords[0]);
+            normal.normalize_inplace(); 
+            float intensity = dot(normal, light_dir);
+            if (intensity > 0.0f)
+            {
+                // Still looks quite janky, most likely due to z-fighting.
+                draw_triangle(screen_coords[0], screen_coords[1], screen_coords[2], frame, SDL_MapRGBA(pixel_format, intensity*255, intensity*255, intensity*255, 255));
             }
            
             // The index at which each face begins in mesh.indices.
@@ -184,6 +286,8 @@ int main() {
             f_index_begin += num_vertices;
         }
     }
+
+    frame.flip_image_on_x_axis();
     
     // Main loop.
     while (!quit)

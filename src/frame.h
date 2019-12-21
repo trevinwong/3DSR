@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#include <utility>
 
 class Frame
 {
@@ -16,6 +17,7 @@ class Frame
         Frame& operator=(Frame&& other) noexcept;
         ~Frame();
         void set_pixel(int x, int y, uint32_t color);
+        void flip_image_on_x_axis();
     private:
         void copy(const Frame& other);
 };

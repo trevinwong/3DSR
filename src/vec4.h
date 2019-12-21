@@ -78,14 +78,14 @@ class vec4
 
 inline float dot(const vec4& a, const vec4& b)
 {
-    return ((a.x * b.x) + (a.y + b.y) + (a.z + b.z) + (a.w + b.w));
+    return ((a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w));
 }
 
 // Take the first vector's w as the w of the new vector.
 inline vec4 cross(const vec4& a, const vec4& b)
 {
-    return vec4( (a.z * b.y - a.y * b.z),
-                    (a.x * b.z - a.z * b.x), 
-                    (a.x * b.y - a.y * b.x),
-                    a.w);
+    return vec4((a.y * b.z - a.z * b.y),
+                (a.z * b.x - a.x * b.z), 
+                (a.x * b.y - a.y * b.x),
+                a.w);
 }
