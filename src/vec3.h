@@ -68,7 +68,7 @@ class vec3
             return *this;
         }
 
-        vec3 operator-(vec3& v)
+        vec3 operator-(const vec3& v)
         {
             return vec3(x - v.x, y - v.y, z - v.z);
         }

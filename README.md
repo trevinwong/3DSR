@@ -56,7 +56,7 @@ Fun fact: you don't need to specify the exact path of where the header lives, as
 
 ### Visibility
 
-13. Occlusion culling using a z-buffer.
+13. ~~Occlusion culling using a z-buffer.~~
 14. Setting up an actual camera and perspective projection. Proper handling of coordinates, including conversion to camera coordinates, to screen coordinates.
 15. Back-face culling.
 16. Frustum culling.
@@ -82,6 +82,7 @@ Fun fact: you don't need to specify the exact path of where the header lives, as
 ## Lessons
 
 - Be wary of where your cross product vector points. Place your thumb in the direction of the first vector and your index finger in the direction of the second vector. Your middle finger should be perpendicular and show the direction of the cross product vector. Remember to do this with the appropriate handedness of your coordinate system (left-hand/right-hand).
+- Be careful of using `std::numeric_limits<float>::min()` since this will give you the lowest possible POSITIVE value. Use `std::numeric_limits<float>::lowest()` instead.
 
 ## References
 
@@ -98,3 +99,7 @@ For learning SDL2, this website has been very handy:
 For a deeper overview into the basic rasterization algorithm:
 
 - https://fgiesen.wordpress.com/2013/02/08/triangle-rasterization-in-practice/
+- https://www.scratchapixel.com/lessons/3d-basic-rendering/rasterization-practical-implementation/rasterization-stage
+
+About barycentric coordinates:
+- https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/barycentric-coordinates

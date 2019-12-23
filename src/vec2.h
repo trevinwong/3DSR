@@ -1,4 +1,5 @@
 #pragma once
+#include "vec3.h"
 
 // Implementation inspired by Eric Lengyel's in Foundations of Game Engine Development Vol 1.
 class vec2
@@ -10,6 +11,11 @@ class vec2
 
         vec2(float a, float b)
             : x(a), y(b)
+        {
+        }
+
+        vec2(const vec3& v)
+            : x(v.x), y(v.y)
         {
         }
 
@@ -62,7 +68,7 @@ class vec2
             return *this;
         }
 
-        vec2 operator-(vec2& v)
+        vec2 operator-(const vec2& v)
         {
             return vec2(x - v.x, y - v.y);
         }

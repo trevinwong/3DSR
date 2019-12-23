@@ -1,4 +1,5 @@
 #include <iostream>
+#include <limits>
 #include <utility>
 #include <cmath>
 #include <iomanip>
@@ -76,10 +77,13 @@ void draw_line(int x0, int y0, int x1, int y1, Frame& frame)
     }
 }
 
-// Given the edge v0, calculate the value of the edge function with input v1, which is the vector to the point we are testing.
-int orientation_wrt_edge(vec2& edge, vec2& to_point)
+// We are given two vectors with z = 0, and want to calculate their cross product.
+// This is equivalent to the 2x2 determinant formed by the vectors created by their x and y components.
+// This is also equivalent to the area of the parallelogram formed by the two vectors.
+// This is also equivalent to comparing b to the edge function of a.
+float cross_2d(const vec2& a, const vec2& b)
 {
-    return (edge.x * to_point.y) - (edge.y * to_point.x);
+    return (a.x * b.y) - (a.y * b.x);
 }
 
 int min3(int a, int b, int c)
@@ -97,9 +101,8 @@ void print_hex(uint32_t num)
     std::cout << std::setfill('0') << std::setw(8) << std::hex << num << '\n';
 }
 
-// We use vec2 to represent our 2d points.
 // Assume p0, p1 and p2 are listed in CCW order, and we're using a right-hand coordinate system.
-void draw_triangle(vec2& p0, vec2& p1, vec2& p2, Frame& frame, uint32_t color)
+void draw_triangle(vec3& p0, vec3& p1, vec3& p2, Frame& frame, uint32_t color, float* z_buffer)
 {
     vec2 edge0 = (p1 - p0);
     vec2 edge1 = (p2 - p1);
@@ -122,17 +125,36 @@ void draw_triangle(vec2& p0, vec2& p1, vec2& p2, Frame& frame, uint32_t color)
     {
         for (int j = min_y; j < max_y; j++)
         {
-            vec2 to_point_from_p0 = vec2(i, j) - p0;
-            vec2 to_point_from_p1 = vec2(i, j) - p1;
-            vec2 to_point_from_p2 = vec2(i, j) - p2;
+            vec2 to_point_from_p0 = vec2(i, j) - vec2(p0);
+            vec2 to_point_from_p1 = vec2(i, j) - vec2(p1);
+            vec2 to_point_from_p2 = vec2(i, j) - vec2(p2);
 
-            int orient0 = orientation_wrt_edge(edge0, to_point_from_p0); 
-            int orient1 = orientation_wrt_edge(edge1, to_point_from_p1); 
-            int orient2 = orientation_wrt_edge(edge2, to_point_from_p2); 
+            float v0v1p = cross_2d(edge0, to_point_from_p0); 
+            float v1v2p = cross_2d(edge1, to_point_from_p1); 
+            float v2v0p = cross_2d(edge2, to_point_from_p2); 
 
-            if (orient0 >= 0 && orient1 >= 0 && orient2 >= 0)
+            if (v0v1p >= 0 && v1v2p >= 0 && v2v0p >= 0)
             {
-                frame.set_pixel(i, j, color);
+                float v0v1v2 = cross_2d(p1 - p0, p2 - p0);
+
+                // Calculate barycentric coordinates. We can leave out the division by 2 since we're just getting the ratio between the sub-triangle and the triangle.
+                float w0 = v0v1p / v0v1v2; // corresponds to the weight of p2
+                float w1 = v1v2p / v0v1v2; // corresponds to the weight of p0
+                float w2 = v2v0p / v0v1v2; // corresponds to the weight of p1
+
+                float z = 0;
+                z += (w0 * p2.z);
+                z += (w1 * p0.z);
+                z += (w2 * p1.z);
+
+
+                // If the z-value of the pixel we're on is greater than our current stored z-buffer's value...
+                if (z_buffer[i + (j * frame.w)] < z)
+                {
+                    // Replace it and color that pixel in.
+                    z_buffer[i + (j * frame.w)] = z;
+                    frame.set_pixel(i, j, color);
+                }
             }
         }
     }
@@ -216,6 +238,14 @@ int main() {
     vec3 light_dir(0, 0, 1);
 
     // Time to draw the mesh.
+   
+    // Let's allocate our z-buffer.
+    float* z_buffer = new float[frame.w * frame.h];
+    for (int i = 0; i < frame.w * frame.h; i++)
+    {
+        z_buffer[i] = std::numeric_limits<float>::lowest();
+    }
+
     // For each shape...
     for (size_t s = 0; s < shapes.size(); s++)
     {
@@ -227,8 +257,7 @@ int main() {
             int num_vertices = shapes[s].mesh.num_face_vertices[f];
 
             std::vector<vec3> world_coords;
-            std::vector<vec2> screen_coords;
-            std::vector<vec3> normals;
+            std::vector<vec3> screen_coords;
             
             // All vertices are stored in counter-clockwise order by default.
             for (size_t v = 0; v < num_vertices; v++)
@@ -250,7 +279,7 @@ int main() {
                 tinyobj::real_t next_vz = attrib.vertices[3*next_idx.vertex_index + 2];
 
                 world_coords.push_back(vec3(vx, vy, vz));
-                screen_coords.push_back(vec2((int) ((vx+1)*frame.w/2), (int)((vy+1)*frame.h/2)));
+                screen_coords.push_back(vec3((int) ((vx+1)*frame.w/2), (int)((vy+1)*frame.h/2), vz));
 
                 // We draw a line between this vertex and the next vertex.
                 // Note that all vertices are normalized, and in "world coordinates".
@@ -263,21 +292,15 @@ int main() {
                 tinyobj::real_t nx = attrib.vertices[3*idx.normal_index + 0];
                 tinyobj::real_t ny = attrib.vertices[3*idx.normal_index + 1];
                 tinyobj::real_t nz = attrib.vertices[3*idx.normal_index + 2];
-
-                normals.push_back(vec3(nx, ny, nz));
             }
 
-            // draw_triangle(screen_coords[0], screen_coords[1], screen_coords[2], frame, SDL_MapRGBA(pixel_format, rand()%255, rand()%255, rand()%255, 255));
-
-            // The normals are given to us, but let's calculate them for fun.
-            // vec3 normal = cross(world_coords[2] - world_coords[0], world_coords[1] - world_coords[0]);
+            // The face normal is given, but let's calculate them for fun.
             vec3 normal = cross(world_coords[1] - world_coords[0], world_coords[2] - world_coords[0]);
             normal.normalize_inplace(); 
             float intensity = dot(normal, light_dir);
             if (intensity > 0.0f)
             {
-                // Still looks quite janky, most likely due to z-fighting.
-                draw_triangle(screen_coords[0], screen_coords[1], screen_coords[2], frame, SDL_MapRGBA(pixel_format, intensity*255, intensity*255, intensity*255, 255));
+                draw_triangle(screen_coords[0], screen_coords[1], screen_coords[2], frame, SDL_MapRGBA(pixel_format, intensity*255, intensity*255, intensity*255, 255), z_buffer);
             }
            
             // The index at which each face begins in mesh.indices.
@@ -308,6 +331,7 @@ int main() {
         SDL_RenderPresent(renderer);
     }
 
+    delete z_buffer; // deallocate z-buffer
     SDL_DestroyWindow(window);
     SDL_Quit();
     return 0;
