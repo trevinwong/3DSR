@@ -1,4 +1,5 @@
 #pragma once
+#include <iostream>
 
 // Implementation inspired by Eric Lengyel's in Foundations of Game Engine Development Vol 1.
 class vec4
@@ -47,6 +48,12 @@ class vec4
             return vec4(x * s, y * s, z * s, w * s);
         }
 
+        vec4 operator/(float s)
+        {
+            s = 1.0f / s;
+            return vec4(x * s, y * s, z * s, w * s);
+        }
+
         vec4& operator+=(vec4& v)
         {
             x += v.x;
@@ -73,6 +80,11 @@ class vec4
         vec4 operator-(vec4& v)
         {
             return vec4(x - v.x, y - v.y, z - v.z, w - v.w);
+        }
+
+        void print() const
+        {
+            std::cout << "Vec4" << ": x = " << x << ", y = " << y << ", z = " << z << ", w = " << w << std::endl;
         }
 };
 

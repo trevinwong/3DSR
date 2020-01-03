@@ -10,6 +10,8 @@
 
 #include "vec2.h"
 #include "vec3.h"
+#include "vec4.h"
+#include "mat4.h"
 #include "frame.h"
 
 #define trace(var)  { std::cout << "Line " << __LINE__ << ": " << #var << "=" << var << "\n";}
@@ -160,6 +162,43 @@ void draw_triangle(vec3& p0, vec3& p1, vec3& p2, Frame& frame, uint32_t color, f
     }
 }
 
+// Constructs a view matrix given the position of the eye and the target.
+// Use the unit vector pointing up as our temporary up vector, if none is specified.
+mat4 lookAt(vec3 eye, vec3 target, vec3 up = vec3(0, 1, 0))
+{
+    // Translate eye position back to origin.
+    // Our calculations assume that our eye is positioned at the origin and looks down the -Z axis.
+    mat4 mT         (   1, 0, 0, -eye.x,
+                        0, 1, 0, -eye.y,
+                        0, 0, 1, -eye.z,
+                        0, 0, 0, 1
+                    );
+
+    vec3 forward = eye - target;
+    forward.normalize_inplace();
+
+    // Be very careful with the order of these cross products.
+    vec3 left = cross(up, forward);
+    left.normalize_inplace();
+
+    // Re-calculate our up vector using our forward and left vector.
+    up = cross(forward, left);
+
+    mat4 mR         (   left.x, up.x, forward.x, 0,
+                        left.y, up.y, forward.y, 0,
+                        left.z, up.z, forward.z, 0,
+                        0, 0, 0, 1
+                    );
+
+    // Inverse of mR is equal to the transpose since all basis vectors are orthonormal.
+    // Why do we want to take the inverse? This is the matrix that gives us the rotation of the camera. We want to unrotate it.
+    // Since we've calculated the left vector, unrotating it will give us a camera facing down the -Z axis!!
+    mat4 mR_transpose = transpose(mR); 
+    mat4 mView = mR_transpose * mT;
+
+    return mView;
+}
+
 int main() {
     // Initialize event var. to store events when unqueueing them.
     SDL_Event event;
@@ -188,32 +227,6 @@ int main() {
     // Create a Frame object, which allocates a buffer to draw to.
     Frame frame(WINDOW_WIDTH, WINDOW_HEIGHT);
     
-    /*
-    // 8th quadrant
-    draw_line(200, 200, 250, 300, frame);
-    // 7th quadrant
-    draw_line(200, 200, 300, 250, frame);
-    // 1st quadrant
-    draw_line(200, 200, 300, 150, frame);
-    // 2nd quadrant
-    draw_line(200, 200, 250, 100, frame);
-    // 3rd quadrant
-    draw_line(200, 200, 150, 100, frame);
-    // 4th quadrant
-    draw_line(200, 200, 100, 150, frame);
-    // 5th quadrant
-    draw_line(200, 200, 100, 250, frame);
-    // 6th quadrant
-    draw_line(200, 200, 150, 300, frame);
-    */
-
-    /*
-    vec2 v0(200, 200);
-    vec2 v1(400, 200);
-    vec2 v2(300, 300);
-    draw_triangle(v0, v1, v2, frame);
-    */
-
     // Load our object.
     // monkey_flat.obj only specifies vertices, normals and faces.
     std::string inputfile = "obj/african_head.obj";
@@ -234,11 +247,53 @@ int main() {
       exit(1);
     }
 
-    // "Create" a light, in world coords.
+    // Create a light.
     vec3 light_dir(0, 0, 1);
 
-    // Time to draw the mesh.
-   
+    // Create an eye.
+    vec3 eye(0, 0, 2);
+    
+    float t = 1.0f;
+    float b = -t;
+    float r = 1.0f;
+    float l = -r;
+    float n = -1.8f;
+    float f = -100.0f;
+
+    // Here's how the pipeline goes:
+    // Local -> world -> eye -> clip -> screen -> ndcs -> viewport
+    // We don't need to transform our local coordinates into our world coordinates since we have not transformed them in any way.                 
+    
+    // Point our eye towards the origin and construct a view matrix from that to convert to eye coords from world coords.
+    mat4 view = lookAt(eye, vec3(0, 0, 0)); 
+
+    // The math can be found here: http://www.songho.ca/opengl/gl_projectionmatrix.html#perspective
+
+    // Construct the perspective matrix.
+    // Our projected point y' = near * (y/z) so we want to multiply y by near before we do the perspective divide.
+    // Z looks weird but this will allow us to preserve depth information.
+    mat4 perspective(   2*n/(r-l), 0, (r+l)/(r-l), 0,
+                        0, 2*n/(t-b), (t+b)/(t-b), 0,
+                        0, 0, -(f + n)/(f - n), -2*(f * n)/(f - n),
+                        0, 0, -1, 0
+                    );
+    // The sign of the 1 at the very bottom row depends on whether you specify near/far plane using a positive or negative value. 
+
+    // Construct the viewport matrix, which comprises of multiple steps.
+    // Remember, our NDCS coords range from -1 to 1. We want them to range from 0 to 1.
+    // So we do this: (coords + 1), so it ranges from 0 to 2, and then divide by 2, which gets us to our desired range.
+    // Finally, we multiply by our width and height of our viewport!
+    // It all looks like this, using x as an example: width * (x + 1)/2 -> width*x/2 + width/2, which is exactly what's happening here
+    mat4 viewport(   frame.w/2, 0, 0, (frame.w)/2,
+                        0, frame.h/2, 0, (frame.h)/2,
+                        0, 0, 1, 0,
+                        0, 0, 0, 1
+                    );
+
+    // Model-view projection matrix. Note that we don't transform the object from local coords to world coords, so there is no model matrix needed!
+    mat4 mvp = perspective * view;
+
+    // Time to draw the mesh. 
     // Let's allocate our z-buffer.
     float* z_buffer = new float[frame.w * frame.h];
     for (int i = 0; i < frame.w * frame.h; i++)
@@ -257,7 +312,7 @@ int main() {
             int num_vertices = shapes[s].mesh.num_face_vertices[f];
 
             std::vector<vec3> world_coords;
-            std::vector<vec3> screen_coords;
+            std::vector<vec3> viewport_coords;
             
             // All vertices are stored in counter-clockwise order by default.
             for (size_t v = 0; v < num_vertices; v++)
@@ -279,13 +334,15 @@ int main() {
                 tinyobj::real_t next_vz = attrib.vertices[3*next_idx.vertex_index + 2];
 
                 world_coords.push_back(vec3(vx, vy, vz));
-                screen_coords.push_back(vec3((int) ((vx+1)*frame.w/2), (int)((vy+1)*frame.h/2), vz));
+                vec4 clip = mvp * vec4(vx, vy, vz, 1);
+                // TODO: Do some clipping here. Not sure how to reconstruct clipped triangles just yet.
+                vec4 screen = clip / clip.w; // Perspective divide.
 
-                // We draw a line between this vertex and the next vertex.
-                // Note that all vertices are normalized, and in "world coordinates".
-                // We scale it to screen coordinates and do what seems like "orthogonal projection" by completely ignoring z.
-                // Inspired by tinyrenderer.
-                // draw_line((vx+1)*frame.w/2, (vy+1)*frame.h/2, (next_vx+1)*frame.w/2, (next_vy+1)*frame.h/2, frame);
+                vec3 viewport_coord = (viewport * screen);
+                // Need to convert to int otherwise weird black gaps will appear between triangles
+                viewport_coord.x = (int) viewport_coord.x;
+                viewport_coord.y = (int) viewport_coord.y;
+                viewport_coords.push_back(viewport_coord);
 
                 // We can obtain the vertex index by calling idx.normal_index.
                 // All normals are listed in a linear array, so our stride is 3 (x,y,z)
@@ -300,7 +357,7 @@ int main() {
             float intensity = dot(normal, light_dir);
             if (intensity > 0.0f)
             {
-                draw_triangle(screen_coords[0], screen_coords[1], screen_coords[2], frame, SDL_MapRGBA(pixel_format, intensity*255, intensity*255, intensity*255, 255), z_buffer);
+                draw_triangle(viewport_coords[0], viewport_coords[1], viewport_coords[2], frame, SDL_MapRGBA(pixel_format, intensity*255, intensity*255, intensity*255, 255), z_buffer);
             }
            
             // The index at which each face begins in mesh.indices.
@@ -310,7 +367,7 @@ int main() {
         }
     }
 
-    frame.flip_image_on_x_axis();
+//    frame.flip_image_on_x_axis();
     
     // Main loop.
     while (!quit)
@@ -331,7 +388,7 @@ int main() {
         SDL_RenderPresent(renderer);
     }
 
-    delete z_buffer; // deallocate z-buffer
+//    delete z_buffer; // deallocate z-buffer
     SDL_DestroyWindow(window);
     SDL_Quit();
     return 0;

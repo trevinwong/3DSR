@@ -57,18 +57,18 @@ Fun fact: you don't need to specify the exact path of where the header lives, as
 ### Visibility
 
 13. ~~Occlusion culling using a z-buffer.~~
-14. Setting up an actual camera and perspective projection. Proper handling of coordinates, including conversion to camera coordinates, to screen coordinates.
+14. ~~Perspective projection.~~
 15. Back-face culling.
 16. Frustum culling.
 17. Moving the camera.
 
 ### Shaders and Light
 
-18. Setting up basic fragment shaders.
-19. Gouraud shading.
-20. Phong shading.
-21. Texture mapping.
-22. Shadows.
+18. Texture mapping.
+19. Perspective-correct interpolated normals.
+21. Gouraud shading.
+22. Phong shading.
+23. Shadow maps.
 
 ## House-keeping
 
@@ -78,6 +78,10 @@ Fun fact: you don't need to specify the exact path of where the header lives, as
 - Possibly abstract out `SDL_MakeRGBA` into a color class.
 - Possibly abstract out renderer (i.e `draw_line`, `draw_triangle`)
 - Look into separating out loading the mesh and storing its data into a separate class.
+- Look into creating an interface for shaders.
+- Look into a better interface to load models with.
+- Displaying FPS.
+- Optimization.
 
 ## Lessons
 
@@ -103,3 +107,18 @@ For a deeper overview into the basic rasterization algorithm:
 
 About barycentric coordinates:
 - https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/barycentric-coordinates
+
+About homogeneous coordinates:
+- http://www.songho.ca/math/homogeneous/homogeneous.html
+
+About the coordinate transform pipeline:
+- https://www.youtube.com/watch?v=jmRkYDFDIp0&list=PLbMVogVj5nJSyt80VRXYC-YrAvQuUb6dh&index=19 (awesome series of videos, but be warned, his math is possibly incorrect)
+- http://www.songho.ca/opengl/gl_transform.html#projection (overview)
+- http://math.hws.edu/graphicsbook/c3/s3.html (overview)
+- https://computergraphics.stackexchange.com/questions/1769/world-coordinates-normalised-device-coordinates-and-device-coordinates (about all the different coordinates)
+- http://www.songho.ca/opengl/gl_camera.html (construction of openGL view matrix)
+- http://www.songho.ca/opengl/gl_projectionmatrix.html#perspective (construction of openGL projection matrix)
+- https://www.scratchapixel.com/lessons/3d-basic-rendering/rasterization-practical-implementation/projection-stage (about projection)
+- https://paroj.github.io/gltut/Positioning/Tut04%20Perspective%20Projection.html (about projection)
+- http://www.codinglabs.net/article_world_view_projection_matrix.aspx (constructing projection matrix at the bottom, using fov)
+- https://computergraphics.stackexchange.com/questions/6271/what-is-the-use-of-homogenous-divide (very good question and answer)

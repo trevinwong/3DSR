@@ -1,4 +1,5 @@
 #pragma once
+#include "vec4.h"
 #include <cmath>
 #include <iostream>
 
@@ -12,6 +13,11 @@ class vec3
 
         vec3(float a, float b, float c)
             : x(a), y(b), z(c)
+        {
+        }
+
+        vec3(const vec4& v)
+            : x(v.x), y(v.y), z(v.z)
         {
         }
 
@@ -81,6 +87,14 @@ class vec3
         void normalize_inplace()
         {
             *this /= length();
+        }
+
+        // Temporary solution.
+        // I want to create a constructor in vec4 using vec3 but circular dependencies.
+        // I could move the definitions into .cpp files but I believe inline definitions have better performance.
+        vec4 homogenize()
+        {
+            return vec4(x, y, z, 1);
         }
 
         void print() const
