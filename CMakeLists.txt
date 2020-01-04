@@ -32,5 +32,8 @@ endif()
 # Inspired by JamesGriffin/3D-Rasterizer.
 file(COPY obj/ DESTINATION "${PROJECT_BINARY_DIR}/obj")
 
+# Copies over our /img directory which contains all of our textures.
+file(COPY img/ DESTINATION "${PROJECT_BINARY_DIR}/img")
+
 target_include_directories(${PROJECT_NAME} PUBLIC ${SDL2_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} PUBLIC ${SDL2_LIBRARIES})

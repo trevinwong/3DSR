@@ -8,6 +8,9 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "../lib/tiny_obj_loader.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "../lib/stb_image.h"
+
 #include "vec2.h"
 #include "vec3.h"
 #include "vec4.h"
@@ -17,6 +20,13 @@
 #define trace(var)  { std::cout << "Line " << __LINE__ << ": " << #var << "=" << var << "\n";}
 
 #include "SDL.h"
+
+// TODO: Refactor this later. Assumed to be RGBA
+struct Texture
+{
+    int width, height;
+    unsigned char* data;
+};
 
 const inline int WINDOW_WIDTH = 800;
 const inline int WINDOW_HEIGHT = 800;
@@ -104,8 +114,13 @@ void print_hex(uint32_t num)
 }
 
 // Assume p0, p1 and p2 are listed in CCW order, and we're using a right-hand coordinate system.
-void draw_triangle(vec3& p0, vec3& p1, vec3& p2, Frame& frame, uint32_t color, float* z_buffer)
+// TODO: Clean up parameters.
+void draw_triangle(vec3& p0, vec3& p1, vec3& p2, Frame& frame, uint32_t color, float* z_buffer, vec2& t0, vec2& t1, vec2& t2, Texture& texture)
 {
+    /* p0.print(); */
+    /* p1.print(); */
+    /* p2.print(); */
+
     vec2 edge0 = (p1 - p0);
     vec2 edge1 = (p2 - p1);
     vec2 edge2 = (p0 - p2);
@@ -131,31 +146,67 @@ void draw_triangle(vec3& p0, vec3& p1, vec3& p2, Frame& frame, uint32_t color, f
             vec2 to_point_from_p1 = vec2(i, j) - vec2(p1);
             vec2 to_point_from_p2 = vec2(i, j) - vec2(p2);
 
+            /*
+            edge0.print();
+            to_point_from_p0.print();
+
+            edge1.print();
+            to_point_from_p1.print();
+
+            edge2.print();
+            to_point_from_p2.print();
+            */
             float v0v1p = cross_2d(edge0, to_point_from_p0); 
             float v1v2p = cross_2d(edge1, to_point_from_p1); 
             float v2v0p = cross_2d(edge2, to_point_from_p2); 
+            // std::cout << " v0v1p: " << v0v1p << " v1v2p: " << v1v2p << " v2v0p: " <<  v2v0p << std::endl;
 
             if (v0v1p >= 0 && v1v2p >= 0 && v2v0p >= 0)
             {
                 float v0v1v2 = cross_2d(p1 - p0, p2 - p0);
 
                 // Calculate barycentric coordinates. We can leave out the division by 2 since we're just getting the ratio between the sub-triangle and the triangle.
+                // TODO: Be careful about dividing by 0.
+                // aka check for degenerate triangles first
                 float w0 = v0v1p / v0v1v2; // corresponds to the weight of p2
                 float w1 = v1v2p / v0v1v2; // corresponds to the weight of p0
                 float w2 = v2v0p / v0v1v2; // corresponds to the weight of p1
 
+                // Get z value by interpolating from each vertice using the barycentric coordinates.
                 float z = 0;
                 z += (w0 * p2.z);
                 z += (w1 * p0.z);
                 z += (w2 * p1.z);
 
+                // Interpolate the value for u, v as well.
+                vec2 uv;
+                /* t2.print(); */
+                /* t0.print(); */
+                /* t1.print(); */
+                /* std::cout << "w0: " << w0 << " w1: " << w1 << " w2: " << w2 << std::endl; */
+                uv += (t2 * w0);
+                uv += (t0 * w1);
+                uv += (t1 * w2);
+
+                /* uv.print(); */
+
+                // Pass in the texture.
+                uv.x = uv.x * texture.width;
+                uv.y = uv.y * texture.height;
+                
+                /* std::cout << "x: " << uv.x << " y: " << uv.y << std::endl; */
+
+                // Sample the color at uv.x and uv.y.
+                uint32_t* texture_data = reinterpret_cast<uint32_t*>(texture.data);
+                uint32_t texture_color = texture_data[(int) (uv.x * uv.y)]; 
+                print_hex(texture_color);
 
                 // If the z-value of the pixel we're on is greater than our current stored z-buffer's value...
                 if (z_buffer[i + (j * frame.w)] < z)
                 {
                     // Replace it and color that pixel in.
                     z_buffer[i + (j * frame.w)] = z;
-                    frame.set_pixel(i, j, color);
+                    frame.set_pixel(i, j, texture_color);
                 }
             }
         }
@@ -293,6 +344,21 @@ int main() {
     // Model-view projection matrix. Note that we don't transform the object from local coords to world coords, so there is no model matrix needed!
     mat4 mvp = perspective * view;
 
+    // Load our texture.
+    int width, height, channels;
+    unsigned char* data = stbi_load("img/african_head_diffuse.tga", &width, &height, &channels, STBI_rgb_alpha);
+    if (data == nullptr)
+    {
+        // Just crash if we can't load the texture.
+        // TODO: Refactor this.
+        std::cout << "Unable to load texture." << std::endl;
+        return 1;
+    }
+    Texture texture;
+    texture.width = width;
+    texture.height = height;
+    texture.data = data;
+
     // Time to draw the mesh. 
     // Let's allocate our z-buffer.
     float* z_buffer = new float[frame.w * frame.h];
@@ -313,6 +379,7 @@ int main() {
 
             std::vector<vec3> world_coords;
             std::vector<vec3> viewport_coords;
+            std::vector<vec2> texture_coords;
             
             // All vertices are stored in counter-clockwise order by default.
             for (size_t v = 0; v < num_vertices; v++)
@@ -340,8 +407,8 @@ int main() {
 
                 vec3 viewport_coord = (viewport * screen);
                 // Need to convert to int otherwise weird black gaps will appear between triangles
-                viewport_coord.x = (int) viewport_coord.x;
-                viewport_coord.y = (int) viewport_coord.y;
+                viewport_coord.x = (float) viewport_coord.x;
+                viewport_coord.y = (float) viewport_coord.y;
                 viewport_coords.push_back(viewport_coord);
 
                 // We can obtain the vertex index by calling idx.normal_index.
@@ -349,6 +416,11 @@ int main() {
                 tinyobj::real_t nx = attrib.vertices[3*idx.normal_index + 0];
                 tinyobj::real_t ny = attrib.vertices[3*idx.normal_index + 1];
                 tinyobj::real_t nz = attrib.vertices[3*idx.normal_index + 2];
+
+                // Textures.
+                tinyobj::real_t tx = attrib.texcoords[2*idx.texcoord_index+0];
+                tinyobj::real_t ty = attrib.texcoords[2*idx.texcoord_index+1];
+                texture_coords.push_back(vec2(tx, ty));
             }
 
             // The face normal is given, but let's calculate them for fun.
@@ -357,7 +429,7 @@ int main() {
             float intensity = dot(normal, light_dir);
             if (intensity > 0.0f)
             {
-                draw_triangle(viewport_coords[0], viewport_coords[1], viewport_coords[2], frame, SDL_MapRGBA(pixel_format, intensity*255, intensity*255, intensity*255, 255), z_buffer);
+                draw_triangle(viewport_coords[0], viewport_coords[1], viewport_coords[2], frame, SDL_MapRGBA(pixel_format, intensity*255, intensity*255, intensity*255, 255), z_buffer, texture_coords[0], texture_coords[1], texture_coords[2], texture);
             }
            
             // The index at which each face begins in mesh.indices.

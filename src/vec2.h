@@ -5,7 +5,7 @@
 class vec2
 {
     public: 
-        float x, y;
+        float x = 0, y = 0;
 
         vec2() = default;
 
@@ -49,19 +49,19 @@ class vec2
             return vec2(x * s, y * s);
         }
 
-        vec2& operator+=(vec2& v)
+        vec2& operator+=(const vec2& v)
         {
             x += v.x;
             y += v.y;
             return *this;
         }
 
-        vec2 operator+(vec2& v)
+        vec2 operator+(const vec2& v)
         {
             return vec2(x + v.x, y + v.y);
         }
 
-        vec2& operator-=(vec2& v)
+        vec2& operator-=(const vec2& v)
         {
             x -= v.x;
             y -= v.y;
@@ -71,6 +71,11 @@ class vec2
         vec2 operator-(const vec2& v)
         {
             return vec2(x - v.x, y - v.y);
+        }
+
+        void print() const
+        {
+            std::cout << "Vec2" << ": x = " << x << ", y = " << y << std::endl;
         }
 };
 

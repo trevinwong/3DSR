@@ -5,7 +5,7 @@
 class vec4
 {
     public: 
-        float x, y, z, w;
+        float x = 0, y = 0, z = 0, w = 0;
 
         vec4() = default;
 
