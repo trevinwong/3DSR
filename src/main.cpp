@@ -194,11 +194,25 @@ void draw_triangle(vec3& p0, vec3& p1, vec3& p2, Frame& frame, uint32_t color, f
                 uv.x = uv.x * texture.width;
                 uv.y = uv.y * texture.height;
                 
-                /* std::cout << "x: " << uv.x << " y: " << uv.y << std::endl; */
-
                 // Sample the color at uv.x and uv.y.
-                uint32_t* texture_data = reinterpret_cast<uint32_t*>(texture.data);
-                uint32_t texture_color = texture_data[(int) (uv.x * uv.y)]; 
+                uint32_t zero  = texture.data[(int) (uv.x * uv.y) * 4]; 
+                zero <<= 24;
+                uint32_t one  = texture.data[(int) ((uv.x * uv.y) * 4) + 1]; 
+                one <<= 16;
+                uint32_t two  = texture.data[(int) ((uv.x * uv.y) * 4) + 2]; 
+                two <<= 8;
+                uint32_t three  = texture.data[(int) ((uv.x * uv.y) * 4) + 3]; 
+
+
+                uint32_t texture_color = 0;
+                texture_color = texture_color | zero;
+                texture_color = texture_color | (one);
+                texture_color = texture_color | (two);
+                texture_color = texture_color | (three);
+                print_hex(zero);
+                print_hex(one);
+                print_hex(two);
+                print_hex(three);
                 print_hex(texture_color);
 
                 // If the z-value of the pixel we're on is greater than our current stored z-buffer's value...
@@ -347,6 +361,7 @@ int main() {
     // Load our texture.
     int width, height, channels;
     unsigned char* data = stbi_load("img/african_head_diffuse.tga", &width, &height, &channels, STBI_rgb_alpha);
+    stbi_set_flip_vertically_on_load(true);
     if (data == nullptr)
     {
         // Just crash if we can't load the texture.
