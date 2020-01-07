@@ -34,6 +34,7 @@ const inline SDL_PixelFormat* pixel_format;
 
 bool quit = false;
 
+
 void draw_line(int x0, int y0, int x1, int y1, Frame& frame)
 {
     int x = x0;
@@ -89,6 +90,13 @@ void draw_line(int x0, int y0, int x1, int y1, Frame& frame)
     }
 }
 
+void draw_line(vec3& v0, vec3& v1, vec3& v2, Frame& frame)
+{
+    draw_line(v0.x, v0.y, v1.x, v1.y, frame);
+    draw_line(v1.x, v1.y, v2.x, v2.y, frame);
+    draw_line(v2.x, v2.y, v0.x, v0.y, frame);
+}
+
 // We are given two vectors with z = 0, and want to calculate their cross product.
 // This is equivalent to the 2x2 determinant formed by the vectors created by their x and y components.
 // This is also equivalent to the area of the parallelogram formed by the two vectors.
@@ -115,20 +123,11 @@ void print_hex(uint32_t num)
 
 // Assume p0, p1 and p2 are listed in CCW order, and we're using a right-hand coordinate system.
 // TODO: Clean up parameters.
-void draw_triangle(vec3& p0, vec3& p1, vec3& p2, Frame& frame, uint32_t color, float* z_buffer, vec2& t0, vec2& t1, vec2& t2, Texture& texture)
+void draw_triangle(vec3& p0, vec3& p1, vec3& p2, Frame& frame, float* z_buffer, vec2& t0, vec2& t1, vec2& t2, Texture& texture)
 {
     /* p0.print(); */
     /* p1.print(); */
     /* p2.print(); */
-
-    // For some reason, coordinates have to be converted to int otherwise weird black lines will show up.
-    // This causes a problem where the area of the triangle can be 0 so we need to skip those when it happens.
-    p0.x = (int) p0.x;
-    p0.y = (int) p0.y;
-    p1.x = (int) p1.x;
-    p1.y = (int) p1.y;
-    p2.x = (int) p2.x;
-    p2.y = (int) p2.y;
 
     vec2 edge0 = (p1 - p0);
     vec2 edge1 = (p2 - p1);
@@ -330,6 +329,14 @@ int main() {
     // Local -> world -> eye -> clip -> screen -> ndcs -> viewport
     // We don't need to transform our local coordinates into our world coordinates since we have not transformed them in any way.                 
     
+    // Construct our model matrix.
+    // (i.e should contain any of the transformations we make to the model in the world, which right now is none)
+    mat4 model      (   1, 0, 0, 0,
+                        0, 1, 0, 0,
+                        0, 0, 1, 0,
+                        0, 0, 0, 1
+                    );
+    
     // Point our eye towards the origin and construct a view matrix from that to convert to eye coords from world coords.
     mat4 view = lookAt(eye, vec3(0, 0, 0)); 
 
@@ -357,7 +364,7 @@ int main() {
                     );
 
     // Model-view projection matrix. Note that we don't transform the object from local coords to world coords, so there is no model matrix needed!
-    mat4 mvp = perspective * view;
+    mat4 mvp = perspective * view * model;
 
     // Load our texture.
     int width, height, channels;
@@ -424,8 +431,8 @@ int main() {
 
                 vec3 viewport_coord = (viewport * screen);
                 // Need to convert to int otherwise weird black gaps will appear between triangles
-                viewport_coord.x = (float) viewport_coord.x;
-                viewport_coord.y = (float) viewport_coord.y;
+                viewport_coord.x = (int) viewport_coord.x;
+                viewport_coord.y = (int) viewport_coord.y;
                 viewport_coords.push_back(viewport_coord);
 
                 // We can obtain the vertex index by calling idx.normal_index.
@@ -440,14 +447,20 @@ int main() {
                 texture_coords.push_back(vec2(tx, ty));
             }
 
-            // The face normal is given, but let's calculate them for fun.
+            // Calculate the normal of the face.
             vec3 normal = cross(world_coords[1] - world_coords[0], world_coords[2] - world_coords[0]);
-            normal.normalize_inplace(); 
-            float intensity = dot(normal, light_dir);
-            if (intensity > 0.0f)
+
+            // Create the viewing vector - using one of the vertices of the polygon, create a vector from the eye's position to it.
+            // Note that our eye is in world space and we're using the world space version of the vertex.
+            vec3 viewing = world_coords[0] - eye;
+
+            float facing = dot(normal, viewing);
+            // If facing is positive, that means the polygon is facing the same direction as the viewing vector, aka, AWAY
+            if (facing < 0)
             {
-                draw_triangle(viewport_coords[0], viewport_coords[1], viewport_coords[2], frame, SDL_MapRGBA(pixel_format, intensity*255, intensity*255, intensity*255, 255), z_buffer, texture_coords[0], texture_coords[1], texture_coords[2], texture);
-            }
+                // draw_line(viewport_coords[0], viewport_coords[1], viewport_coords[2], frame);
+                draw_triangle(viewport_coords[0], viewport_coords[1], viewport_coords[2], frame, z_buffer, texture_coords[0], texture_coords[1], texture_coords[2], texture);
+            }   
            
             // The index at which each face begins in mesh.indices.
             // Remember that each face could have a variable number of vertices (3, 4, 5, etc.), so the index at which a face begins must be adjusted

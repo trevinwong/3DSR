@@ -58,7 +58,7 @@ Fun fact: you don't need to specify the exact path of where the header lives, as
 
 13. ~~Occlusion culling using a z-buffer.~~
 14. ~~Perspective projection.~~
-15. Back-face culling.
+15. ~~Back-face culling.~~
 16. Frustum culling.
 17. Moving the camera.
 
