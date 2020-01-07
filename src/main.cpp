@@ -24,7 +24,7 @@
 // TODO: Refactor this later. Assumed to be RGBA
 struct Texture
 {
-    int width, height;
+    int width, height, channels;
     unsigned char* data;
 };
 
@@ -121,6 +121,15 @@ void draw_triangle(vec3& p0, vec3& p1, vec3& p2, Frame& frame, uint32_t color, f
     /* p1.print(); */
     /* p2.print(); */
 
+    // For some reason, coordinates have to be converted to int otherwise weird black lines will show up.
+    // This causes a problem where the area of the triangle can be 0 so we need to skip those when it happens.
+    p0.x = (int) p0.x;
+    p0.y = (int) p0.y;
+    p1.x = (int) p1.x;
+    p1.y = (int) p1.y;
+    p2.x = (int) p2.x;
+    p2.y = (int) p2.y;
+
     vec2 edge0 = (p1 - p0);
     vec2 edge1 = (p2 - p1);
     vec2 edge2 = (p0 - p2);
@@ -165,9 +174,11 @@ void draw_triangle(vec3& p0, vec3& p1, vec3& p2, Frame& frame, uint32_t color, f
             {
                 float v0v1v2 = cross_2d(p1 - p0, p2 - p0);
 
+                if (v0v1v2 == 0) return;
+
                 // Calculate barycentric coordinates. We can leave out the division by 2 since we're just getting the ratio between the sub-triangle and the triangle.
                 // TODO: Be careful about dividing by 0.
-                // aka check for degenerate triangles first
+                // aka check for degenerate triangles first?
                 float w0 = v0v1p / v0v1v2; // corresponds to the weight of p2
                 float w1 = v1v2p / v0v1v2; // corresponds to the weight of p0
                 float w2 = v2v0p / v0v1v2; // corresponds to the weight of p1
@@ -191,29 +202,19 @@ void draw_triangle(vec3& p0, vec3& p1, vec3& p2, Frame& frame, uint32_t color, f
                 /* uv.print(); */
 
                 // Pass in the texture.
-                uv.x = uv.x * texture.width;
-                uv.y = uv.y * texture.height;
-                
+                // The u,v coordinates HAVE to be floored before indexing the texture color with them!
+                uv.x = std::floor(uv.x * texture.width);
+                uv.y = std::floor(uv.y * texture.height);
+ 
                 // Sample the color at uv.x and uv.y.
-                uint32_t zero  = texture.data[(int) (uv.x * uv.y) * 4]; 
-                zero <<= 24;
-                uint32_t one  = texture.data[(int) ((uv.x * uv.y) * 4) + 1]; 
-                one <<= 16;
-                uint32_t two  = texture.data[(int) ((uv.x * uv.y) * 4) + 2]; 
-                two <<= 8;
-                uint32_t three  = texture.data[(int) ((uv.x * uv.y) * 4) + 3]; 
-
-
-                uint32_t texture_color = 0;
-                texture_color = texture_color | zero;
-                texture_color = texture_color | (one);
-                texture_color = texture_color | (two);
-                texture_color = texture_color | (three);
-                print_hex(zero);
-                print_hex(one);
-                print_hex(two);
-                print_hex(three);
-                print_hex(texture_color);
+                // Nice way of sampling borrowed from NotCamelCase/SoftLit.
+                // TODO: Abstract getting texture color (won't always be in RGB fashion)
+                // TODO: Texture seems a little redder than it should be. Investigate
+                int idx = ((uv.y * texture.width) + uv.x) * texture.channels;
+                float r = (float) texture.data[idx++];
+                float b = (float) texture.data[idx++];
+                float g = (float) texture.data[idx++];
+                uint32_t texture_color = SDL_MapRGBA(pixel_format, r, g, b, 255);
 
                 // If the z-value of the pixel we're on is greater than our current stored z-buffer's value...
                 if (z_buffer[i + (j * frame.w)] < z)
@@ -360,8 +361,8 @@ int main() {
 
     // Load our texture.
     int width, height, channels;
-    unsigned char* data = stbi_load("img/african_head_diffuse.tga", &width, &height, &channels, STBI_rgb_alpha);
     stbi_set_flip_vertically_on_load(true);
+    unsigned char* data = stbi_load("img/african_head_diffuse.tga", &width, &height, &channels, 0);
     if (data == nullptr)
     {
         // Just crash if we can't load the texture.
@@ -372,6 +373,7 @@ int main() {
     Texture texture;
     texture.width = width;
     texture.height = height;
+    texture.channels = channels;
     texture.data = data;
 
     // Time to draw the mesh. 
