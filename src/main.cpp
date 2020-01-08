@@ -216,7 +216,7 @@ void draw_triangle(vec3& p0, vec3& p1, vec3& p2, Frame& frame, float* z_buffer, 
                 uint32_t texture_color = SDL_MapRGBA(pixel_format, r, g, b, 255);
 
                 // If the z-value of the pixel we're on is greater than our current stored z-buffer's value...
-                if (z_buffer[i + (j * frame.w)] < z)
+                if (z < z_buffer[i + (j * frame.w)])
                 {
                     // Replace it and color that pixel in.
                     z_buffer[i + (j * frame.w)] = z;
@@ -322,13 +322,13 @@ int main() {
     float b = -t;
     float r = 1.0f;
     float l = -r;
-    float n = -1.8f;
-    float f = -100.0f;
+    float n = 1.8f;
+    float f = 10.0f;
 
     // Here's how the pipeline goes:
-    // Local -> world -> eye -> clip -> screen -> ndcs -> viewport
+    // Local -> world -> eye -> clip -> screen -> viewport
     // We don't need to transform our local coordinates into our world coordinates since we have not transformed them in any way.                 
-    
+   
     // Construct our model matrix.
     // (i.e should contain any of the transformations we make to the model in the world, which right now is none)
     mat4 model      (   1, 0, 0, 0,
@@ -340,26 +340,27 @@ int main() {
     // Point our eye towards the origin and construct a view matrix from that to convert to eye coords from world coords.
     mat4 view = lookAt(eye, vec3(0, 0, 0)); 
 
-    // The math can be found here: http://www.songho.ca/opengl/gl_projectionmatrix.html#perspective
-
+    // The math is from: http://www.songho.ca/opengl/gl_projectionmatrix.html#perspective
+    // NOTE: this assumes n and f are both positive!!!
+    // NOTE: this transforms the coordinates into NDCS coordinates, which FLIPS the direction of our z-axis, essentially
+    // Our camera typically looks down the negative z-axis but after transforming the coordinates it looks down the positive z-axis.
+    // This means your z-buffer implementation needs to change: closer coordinates should be SMALLER, not LARGER
     // Construct the perspective matrix.
-    // Our projected point y' = near * (y/z) so we want to multiply y by near before we do the perspective divide.
-    // Z looks weird but this will allow us to preserve depth information.
     mat4 perspective(   2*n/(r-l), 0, (r+l)/(r-l), 0,
                         0, 2*n/(t-b), (t+b)/(t-b), 0,
                         0, 0, -(f + n)/(f - n), -2*(f * n)/(f - n),
                         0, 0, -1, 0
                     );
-    // The sign of the 1 at the very bottom row depends on whether you specify near/far plane using a positive or negative value. 
 
     // Construct the viewport matrix, which comprises of multiple steps.
     // Remember, our NDCS coords range from -1 to 1. We want them to range from 0 to 1.
     // So we do this: (coords + 1), so it ranges from 0 to 2, and then divide by 2, which gets us to our desired range.
     // Finally, we multiply by our width and height of our viewport!
     // It all looks like this, using x as an example: width * (x + 1)/2 -> width*x/2 + width/2, which is exactly what's happening here
-    mat4 viewport(   frame.w/2, 0, 0, (frame.w)/2,
+    int d = 255;
+    mat4 viewport   (   frame.w/2, 0, 0, (frame.w)/2,
                         0, frame.h/2, 0, (frame.h)/2,
-                        0, 0, 1, 0,
+                        0, 0, d/2, d/2,
                         0, 0, 0, 1
                     );
 
@@ -388,7 +389,7 @@ int main() {
     float* z_buffer = new float[frame.w * frame.h];
     for (int i = 0; i < frame.w * frame.h; i++)
     {
-        z_buffer[i] = std::numeric_limits<float>::lowest();
+        z_buffer[i] = std::numeric_limits<float>::max();
     }
 
     // For each shape...
@@ -425,10 +426,31 @@ int main() {
                 tinyobj::real_t next_vz = attrib.vertices[3*next_idx.vertex_index + 2];
 
                 world_coords.push_back(vec3(vx, vy, vz));
+
+                /* std::cout << std::endl; */
+                /* std::cout << "original coords" << std::endl; */
+                /* vec4(vx, vy, vz, 1).print(); */
+
+                /* vec4 view_coords = view * vec4(vx, vy, vz, 1); */
+                /* std::cout << "view coords" << std::endl; */
+                /* view_coords.print(); */
+
+                /* vec4 clip_coords = perspective * view_coords; */
+                /* std::cout << "clip coords" << std::endl; */
+                /* clip_coords.print(); */
+
+                /* vec4 screen_coords = clip_coords / clip_coords.w; */
+                /* std::cout << "screen coords" << std::endl; */
+                /* screen_coords.print(); */
+
                 vec4 clip = mvp * vec4(vx, vy, vz, 1);
                 // TODO: Do some clipping here. Not sure how to reconstruct clipped triangles just yet.
+                // CHECK IF -w < x < w and -w < y < w because afer dividing by w, -1 < x < 1, same with y
+                // If we throw away the vertex what do we do? where do we reconstruct the vertex?
                 vec4 screen = clip / clip.w; // Perspective divide.
 
+                screen.print();
+                
                 vec3 viewport_coord = (viewport * screen);
                 // Need to convert to int otherwise weird black gaps will appear between triangles
                 viewport_coord.x = (int) viewport_coord.x;
@@ -469,7 +491,7 @@ int main() {
         }
     }
 
-//    frame.flip_image_on_x_axis();
+    frame.flip_image_on_x_axis();
     
     // Main loop.
     while (!quit)

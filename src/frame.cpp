@@ -1,4 +1,5 @@
 #include "frame.h"
+#include <iostream>
 
 Frame::Frame(int width, int height)
     : w(width), h(height)
@@ -45,8 +46,10 @@ void Frame::set_pixel(int x, int y, uint32_t color)
 {
     // The buffer contains each row of the frame in a linear order.
     // We point to the first pixel at (0, 0), select the row using (w * y), then select our column using x.
-    if (x >= w) return;
-    if (y >= h) return;
+    if (x >= w || y >= h)
+    {
+        return;
+    }
     uint32_t* ptr = buffer + (w * y) + x;
     *ptr = color;
 }
