@@ -44,7 +44,7 @@ class vec2
             return *this;
         }
 
-        vec2 operator*(float s)
+        vec2 operator*(float s) const
         {
             return vec2(x * s, y * s);
         }
@@ -56,7 +56,7 @@ class vec2
             return *this;
         }
 
-        vec2 operator+(const vec2& v)
+        vec2 operator+(const vec2& v) const
         {
             return vec2(x + v.x, y + v.y);
         }
@@ -68,7 +68,7 @@ class vec2
             return *this;
         }
 
-        vec2 operator-(const vec2& v)
+        vec2 operator-(const vec2& v) const
         {
             return vec2(x - v.x, y - v.y);
         }

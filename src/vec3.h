@@ -48,7 +48,7 @@ class vec3
             return *this;
         }
 
-        vec3 operator*(float s)
+        vec3 operator*(float s) const
         {
             return vec3(x * s, y * s, z * s);
         }
@@ -61,7 +61,7 @@ class vec3
             return *this;
         }
 
-        vec3 operator+(const vec3& v)
+        vec3 operator+(const vec3& v) const
         {
             return vec3(x + v.x, y + v.y, z + v.z);
         }
@@ -74,7 +74,7 @@ class vec3
             return *this;
         }
 
-        vec3 operator-(const vec3& v)
+        vec3 operator-(const vec3& v) const
         {
             return vec3(x - v.x, y - v.y, z - v.z);
         }

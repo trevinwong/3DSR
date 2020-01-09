@@ -12,6 +12,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "../lib/stb_image.h"
 
+#define PERSPECTIVE
+
 #include "vec2.h"
 #include "vec3.h"
 #include "vec4.h"
@@ -25,6 +27,7 @@
 // TODO: Refactor this later. Assumed to be RGBA
 struct Texture
 {
+    Texture() = default;
     int width, height, channels;
     unsigned char* data;
 };
@@ -34,7 +37,6 @@ const inline int WINDOW_HEIGHT = 800;
 const inline SDL_PixelFormat* pixel_format;
 
 bool quit = false;
-
 
 void draw_line(int x0, int y0, int x1, int y1, Frame& frame)
 {
@@ -124,7 +126,7 @@ void print_hex(uint32_t num)
 
 // Assume p0, p1 and p2 are listed in CCW order, and we're using a right-hand coordinate system.
 // TODO: Clean up parameters.
-void draw_triangle(vec3& p0, vec3& p1, vec3& p2, Frame& frame, float* z_buffer, vec2& t0, vec2& t1, vec2& t2, Texture& texture, std::vector<float> intensities, uint32_t color)
+void draw_triangle(const vec3& p0, const vec3& p1, const vec3& p2, Frame& frame, float* z_buffer, const vec2& t0, const vec2& t1, const vec2& t2, const Texture& texture, const std::vector<float>& intensities, uint32_t color, const std::vector<vec3>& vertex_colors)
 {
     /* p0.print(); */
     /* p1.print(); */
@@ -147,9 +149,9 @@ void draw_triangle(vec3& p0, vec3& p1, vec3& p2, Frame& frame, float* z_buffer, 
     max_y = std::min(max_y, frame.h - 1);
 
     // Iterate through all pixels inside the bounding box.
-    for (int i = min_x; i < max_x; i++)
+    for (int i = min_x; i <= max_x; i++)
     {
-        for (int j = min_y; j < max_y; j++)
+        for (int j = min_y; j <= max_y; j++)
         {
             vec2 to_point_from_p0 = vec2(i, j) - vec2(p0);
             vec2 to_point_from_p1 = vec2(i, j) - vec2(p1);
@@ -205,8 +207,17 @@ void draw_triangle(vec3& p0, vec3& p1, vec3& p2, Frame& frame, float* z_buffer, 
                 intensity += (intensities[2] * w0);
                 intensity += (intensities[0] * w1);
                 intensity += (intensities[1] * w2);
-                intensity = std::max(intensity, 0.0f);
-                std::cout << "intensity: " << intensity << std::endl;
+
+                // Interpolate vertex colors.
+                vec3 color;
+                color += (vertex_colors[2] * w0);
+                color += (vertex_colors[0] * w1);
+                color += (vertex_colors[1] * w2);
+
+                /* std::cout << "intensities[2]: " << intensities[2] * w0 << std::endl; */
+                /* std::cout << "intensities[0]: " << intensities[0] * w1 << std::endl; */
+                /* std::cout << "intensities[1]: " << intensities[1] * w2 << std::endl; */
+                /* std::cout << "intensity: " << intensity << std::endl; */
 
                 // Pass in the texture.
                 // The u,v coordinates HAVE to be floored before indexing the texture color with them!
@@ -216,24 +227,35 @@ void draw_triangle(vec3& p0, vec3& p1, vec3& p2, Frame& frame, float* z_buffer, 
                 // Sample the color at uv.x and uv.y.
                 // Nice way of sampling borrowed from NotCamelCase/SoftLit.
                 // TODO: Abstract getting texture color (won't always be in RGB fashion)
-                // TODO: Texture seems a little redder than it should be. Investigate
+                // TODO: Texture seems a little redder than it should be. Investigate. Try rendering a quad with the texture.
                 int idx = ((uv.y * texture.width) + uv.x) * texture.channels;
-                float r = (float) texture.data[idx++] * intensity;
-                float b = (float) texture.data[idx++] * intensity;
-                float g = (float) texture.data[idx++] * intensity;
+                float r = (float) texture.data[idx++];
+                float b = (float) texture.data[idx++];
+                float g = (float) texture.data[idx++];
                 uint32_t texture_color = SDL_MapRGBA(pixel_format, r, g, b, 255);
+                uint32_t texture_shaded_color = SDL_MapRGBA(pixel_format, r * intensity, g * intensity, b * intensity, 255);
                 uint32_t gouraud_color = SDL_MapRGBA(pixel_format, intensity * 255, intensity * 255, intensity * 255, 255);
+                uint32_t interpolated_colors = SDL_MapRGBA(pixel_format, color.x, color.y, color.z, 255);
 
                 // If the z-value of the pixel we're on is greater than our current stored z-buffer's value...
+                #ifdef PERSPECTIVE
                 if (z < z_buffer[i + (j * frame.w)])
+                #else
+                if (z > z_buffer[i + (j * frame.w)])
+                #endif
                 {
                     // Replace it and color that pixel in.
                     z_buffer[i + (j * frame.w)] = z;
-                    frame.set_pixel(i, j, texture_color);
+                    frame.set_pixel(i, j, interpolated_colors);
                 }
             }
         }
     }
+}
+
+void draw_triangle_simple(const std::vector<vec3>& vertices, const std::vector<vec3>& colors, Frame& frame, float* z_buffer)
+{
+    draw_triangle(vertices[0], vertices[1], vertices[2], frame, z_buffer, vec2(), vec2(), vec2(), Texture(), std::vector<float>(), 0, colors);
 }
 
 // Constructs a view matrix given the position of the eye and the target.
@@ -323,8 +345,7 @@ int main() {
 
     // Create a light.
     // TODO: The light distance should affect the intensity of the shading...
-    vec3 light_dir(0.3, 0, 0.7);
-    light_dir.normalize_inplace();
+    vec3 light_dir(1, 1, 1);
 
     // Create an eye.
     vec3 eye(0, 0, 2);
@@ -400,8 +421,21 @@ int main() {
     float* z_buffer = new float[frame.w * frame.h];
     for (int i = 0; i < frame.w * frame.h; i++)
     {
-        z_buffer[i] = std::numeric_limits<float>::max();
+        #ifdef PERSPECTIVE
+            z_buffer[i] = std::numeric_limits<float>::max();
+        #else 
+            z_buffer[i] = std::numeric_limits<float>::lowest();
+        #endif
     }
+
+    std::vector<vec3> colors;
+    colors.push_back(vec3(255, 0, 0));
+    colors.push_back(vec3(0, 255, 0));
+    colors.push_back(vec3(0, 0, 255));
+
+    draw_triangle()
+
+    #ifdef MODEL
 
     // For each shape...
     for (size_t s = 0; s < shapes.size(); s++)
@@ -451,11 +485,15 @@ int main() {
                 /* std::cout << "screen coords" << std::endl; */
                 /* screen_coords.print(); */
 
-                vec4 clip = mvp * vec4(vx, vy, vz, 1);
-                // TODO: Do some clipping here. Not sure how to reconstruct clipped triangles just yet.
-                // CHECK IF -w < x < w and -w < y < w because afer dividing by w, -1 < x < 1, same with y
-                // If we throw away the vertex what do we do? where do we reconstruct the vertex?
-                vec4 screen = clip / clip.w; // Perspective divide.
+                #ifdef PERSPECTIVE
+                    vec4 clip = mvp * vec4(vx, vy, vz, 1);
+                    // TODO: Do some clipping here. Not sure how to reconstruct clipped triangles just yet.
+                    // CHECK IF -w < x < w and -w < y < w because afer dividing by w, -1 < x < 1, same with y
+                    // If we throw away the vertex what do we do? where do we reconstruct the vertex?
+                    vec4 screen = clip / clip.w; // Perspective divide.
+                #else
+                    vec4 screen = vec4(vx, vy, vz, 1); 
+                #endif
 
                 // TODO: Why is z not between -1 and 1??
                 // Big think: maybe the z thats not between -1 and 1 is clipped out? or should be clipped out, but we don't do it?
@@ -495,40 +533,44 @@ int main() {
                 // Calculate the intensities of each vertex by using the normals.
                 std::vector<float> intensities;
 
-                std::cout << "normal 0 before normalize" << std::endl;
-                normals[0].print();
-                std::cout << "normal 1 before normalize" << std::endl;
-                normals[1].print();
-                std::cout << "normal 2 before normalize" << std::endl;
-                normals[2].print();
+                vec3 to_light_v0 = light_dir - world_coords[0];
+                vec3 to_light_v1 = light_dir - world_coords[1];
+                vec3 to_light_v2 = light_dir - world_coords[2];
+
+                float dist0 = to_light_v0.length();
+                float dist1 = to_light_v1.length();
+                float dist2 = to_light_v2.length();
+
+                to_light_v0.normalize_inplace();
+                to_light_v1.normalize_inplace();
+                to_light_v2.normalize_inplace();
 
                 normals[0].normalize_inplace();
                 normals[1].normalize_inplace();
                 normals[2].normalize_inplace();
 
-                std::cout << "normal 0 after normalize" << std::endl;
-                normals[0].print();
-                std::cout << "normal 1 after normalize" << std::endl;
-                normals[1].print();
-                std::cout << "normal 2 after normalize" << std::endl;
-                normals[2].print();
+                // Set to 0.1f for ambient lighting.
+                float intensity0 = std::max(dot(normals[0], to_light_v0), 0.1f);
+                float intensity1 = std::max(dot(normals[1], to_light_v1), 0.1f);
+                float intensity2 = std::max(dot(normals[2], to_light_v2), 0.1f); 
 
-                float intensity0 = dot(normals[0], light_dir);
-                float intensity1 = dot(normals[1], light_dir);
-                float intensity2 = dot(normals[2], light_dir);
-                std::cout << "intensity 0: " << intensity0 << std::endl;
-                std::cout << "intensity 1: " << intensity1 << std::endl;
-                std::cout << "intensity 2: " << intensity2 << std::endl;
+                // Attenuation.
+                // This makes the model really dark though. Apparently quadratic attenuation is rarely used so the formula is:
+                // 1.0 / (1 + a*d)
+                // http://math.hws.edu/graphicsbook/c7/s2.html 7.27
+                /* intensity0 = intensity0 * (1 / (1 + (0.5 * dist0))); */
+                /* intensity1 = intensity1 * (1 / (1 + (0.5 * dist1))); */
+                /* intensity2 = intensity2 * (1 / (1 + (0.5 * dist2))); */
 
                 intensities.push_back(intensity0);
                 intensities.push_back(intensity1);
                 intensities.push_back(intensity2);
 
-                float intensity = dot(normal, light_dir);
+                float intensity = std::max(dot(normal, to_light_v0), 0.0f);
                 uint32_t color = SDL_MapRGBA(pixel_format, intensity * 255, intensity * 255, intensity * 255, 255);
                 
                 // draw_line(viewport_coords[0], viewport_coords[1], viewport_coords[2], frame);
-                draw_triangle(viewport_coords[0], viewport_coords[1], viewport_coords[2], frame, z_buffer, texture_coords[0], texture_coords[1], texture_coords[2], texture, intensities, color);
+                draw_triangle(viewport_coords[0], viewport_coords[1], viewport_coords[2], frame, z_buffer, texture_coords[0], texture_coords[1], texture_coords[2], texture, intensities, color, colors);
             }   
            
             // The index at which each face begins in mesh.indices.
@@ -537,6 +579,7 @@ int main() {
             f_index_begin += num_vertices;
         }
     }
+    #endif
 
     frame.flip_image_on_x_axis();
     
