@@ -4,6 +4,7 @@
 #include <cmath>
 #include <iomanip>
 #include <cstdint>
+#include <algorithm>
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "../lib/tiny_obj_loader.h"
@@ -123,7 +124,7 @@ void print_hex(uint32_t num)
 
 // Assume p0, p1 and p2 are listed in CCW order, and we're using a right-hand coordinate system.
 // TODO: Clean up parameters.
-void draw_triangle(vec3& p0, vec3& p1, vec3& p2, Frame& frame, float* z_buffer, vec2& t0, vec2& t1, vec2& t2, Texture& texture)
+void draw_triangle(vec3& p0, vec3& p1, vec3& p2, Frame& frame, float* z_buffer, vec2& t0, vec2& t1, vec2& t2, Texture& texture, std::vector<float> intensities, uint32_t color)
 {
     /* p0.print(); */
     /* p1.print(); */
@@ -189,6 +190,7 @@ void draw_triangle(vec3& p0, vec3& p1, vec3& p2, Frame& frame, float* z_buffer, 
                 z += (w2 * p1.z);
 
                 // Interpolate the value for u, v as well.
+                // TODO: should we have a specific syntax for zero initializing vectors?
                 vec2 uv;
                 /* t2.print(); */
                 /* t0.print(); */
@@ -198,7 +200,13 @@ void draw_triangle(vec3& p0, vec3& p1, vec3& p2, Frame& frame, float* z_buffer, 
                 uv += (t0 * w1);
                 uv += (t1 * w2);
 
-                /* uv.print(); */
+                // Interpolate the intensity of the color.
+                float intensity = 0;
+                intensity += (intensities[2] * w0);
+                intensity += (intensities[0] * w1);
+                intensity += (intensities[1] * w2);
+                intensity = std::max(intensity, 0.0f);
+                std::cout << "intensity: " << intensity << std::endl;
 
                 // Pass in the texture.
                 // The u,v coordinates HAVE to be floored before indexing the texture color with them!
@@ -210,10 +218,11 @@ void draw_triangle(vec3& p0, vec3& p1, vec3& p2, Frame& frame, float* z_buffer, 
                 // TODO: Abstract getting texture color (won't always be in RGB fashion)
                 // TODO: Texture seems a little redder than it should be. Investigate
                 int idx = ((uv.y * texture.width) + uv.x) * texture.channels;
-                float r = (float) texture.data[idx++];
-                float b = (float) texture.data[idx++];
-                float g = (float) texture.data[idx++];
+                float r = (float) texture.data[idx++] * intensity;
+                float b = (float) texture.data[idx++] * intensity;
+                float g = (float) texture.data[idx++] * intensity;
                 uint32_t texture_color = SDL_MapRGBA(pixel_format, r, g, b, 255);
+                uint32_t gouraud_color = SDL_MapRGBA(pixel_format, intensity * 255, intensity * 255, intensity * 255, 255);
 
                 // If the z-value of the pixel we're on is greater than our current stored z-buffer's value...
                 if (z < z_buffer[i + (j * frame.w)])
@@ -313,7 +322,9 @@ int main() {
     }
 
     // Create a light.
-    vec3 light_dir(0, 0, 1);
+    // TODO: The light distance should affect the intensity of the shading...
+    vec3 light_dir(0.3, 0, 0.7);
+    light_dir.normalize_inplace();
 
     // Create an eye.
     vec3 eye(0, 0, 2);
@@ -405,6 +416,7 @@ int main() {
             std::vector<vec3> world_coords;
             std::vector<vec3> viewport_coords;
             std::vector<vec2> texture_coords;
+            std::vector<vec3> normals;
             
             // All vertices are stored in counter-clockwise order by default.
             for (size_t v = 0; v < num_vertices; v++)
@@ -420,10 +432,6 @@ int main() {
                 tinyobj::real_t vx = attrib.vertices[3*idx.vertex_index + 0];
                 tinyobj::real_t vy = attrib.vertices[3*idx.vertex_index + 1];
                 tinyobj::real_t vz = attrib.vertices[3*idx.vertex_index + 2];
-
-                tinyobj::real_t next_vx = attrib.vertices[3*next_idx.vertex_index + 0];
-                tinyobj::real_t next_vy = attrib.vertices[3*next_idx.vertex_index + 1];
-                tinyobj::real_t next_vz = attrib.vertices[3*next_idx.vertex_index + 2];
 
                 world_coords.push_back(vec3(vx, vy, vz));
 
@@ -449,7 +457,9 @@ int main() {
                 // If we throw away the vertex what do we do? where do we reconstruct the vertex?
                 vec4 screen = clip / clip.w; // Perspective divide.
 
-                screen.print();
+                // TODO: Why is z not between -1 and 1??
+                // Big think: maybe the z thats not between -1 and 1 is clipped out? or should be clipped out, but we don't do it?
+                // Somehow offscreen vertices are being clipped out at a later process - likely at the bounds checking during rasterization
                 
                 vec3 viewport_coord = (viewport * screen);
                 // Need to convert to int otherwise weird black gaps will appear between triangles
@@ -462,6 +472,7 @@ int main() {
                 tinyobj::real_t nx = attrib.vertices[3*idx.normal_index + 0];
                 tinyobj::real_t ny = attrib.vertices[3*idx.normal_index + 1];
                 tinyobj::real_t nz = attrib.vertices[3*idx.normal_index + 2];
+                normals.push_back(vec3(nx, ny, nz));
 
                 // Textures.
                 tinyobj::real_t tx = attrib.texcoords[2*idx.texcoord_index+0];
@@ -471,6 +482,7 @@ int main() {
 
             // Calculate the normal of the face.
             vec3 normal = cross(world_coords[1] - world_coords[0], world_coords[2] - world_coords[0]);
+            normal.normalize_inplace();
 
             // Create the viewing vector - using one of the vertices of the polygon, create a vector from the eye's position to it.
             // Note that our eye is in world space and we're using the world space version of the vertex.
@@ -480,8 +492,43 @@ int main() {
             // If facing is positive, that means the polygon is facing the same direction as the viewing vector, aka, AWAY
             if (facing < 0)
             {
+                // Calculate the intensities of each vertex by using the normals.
+                std::vector<float> intensities;
+
+                std::cout << "normal 0 before normalize" << std::endl;
+                normals[0].print();
+                std::cout << "normal 1 before normalize" << std::endl;
+                normals[1].print();
+                std::cout << "normal 2 before normalize" << std::endl;
+                normals[2].print();
+
+                normals[0].normalize_inplace();
+                normals[1].normalize_inplace();
+                normals[2].normalize_inplace();
+
+                std::cout << "normal 0 after normalize" << std::endl;
+                normals[0].print();
+                std::cout << "normal 1 after normalize" << std::endl;
+                normals[1].print();
+                std::cout << "normal 2 after normalize" << std::endl;
+                normals[2].print();
+
+                float intensity0 = dot(normals[0], light_dir);
+                float intensity1 = dot(normals[1], light_dir);
+                float intensity2 = dot(normals[2], light_dir);
+                std::cout << "intensity 0: " << intensity0 << std::endl;
+                std::cout << "intensity 1: " << intensity1 << std::endl;
+                std::cout << "intensity 2: " << intensity2 << std::endl;
+
+                intensities.push_back(intensity0);
+                intensities.push_back(intensity1);
+                intensities.push_back(intensity2);
+
+                float intensity = dot(normal, light_dir);
+                uint32_t color = SDL_MapRGBA(pixel_format, intensity * 255, intensity * 255, intensity * 255, 255);
+                
                 // draw_line(viewport_coords[0], viewport_coords[1], viewport_coords[2], frame);
-                draw_triangle(viewport_coords[0], viewport_coords[1], viewport_coords[2], frame, z_buffer, texture_coords[0], texture_coords[1], texture_coords[2], texture);
+                draw_triangle(viewport_coords[0], viewport_coords[1], viewport_coords[2], frame, z_buffer, texture_coords[0], texture_coords[1], texture_coords[2], texture, intensities, color);
             }   
            
             // The index at which each face begins in mesh.indices.

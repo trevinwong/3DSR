@@ -53,7 +53,7 @@ class vec3
             return vec3(x * s, y * s, z * s);
         }
 
-        vec3& operator+=(vec3& v)
+        vec3& operator+=(const vec3& v)
         {
             x += v.x;
             y += v.y;
@@ -61,12 +61,12 @@ class vec3
             return *this;
         }
 
-        vec3 operator+(vec3& v)
+        vec3 operator+(const vec3& v)
         {
             return vec3(x + v.x, y + v.y, z + v.z);
         }
 
-        vec3& operator-=(vec3& v)
+        vec3& operator-=(const vec3& v)
         {
             x -= v.x;
             y -= v.y;
