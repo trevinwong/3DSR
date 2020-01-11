@@ -12,7 +12,9 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "../lib/stb_image.h"
 
-// #define PERSPECTIVE
+#define PERSPECTIVE
+// #define MODEL
+// #define ZBUFFER
 
 #include "vec2.h"
 #include "vec3.h"
@@ -123,6 +125,13 @@ int max3(int a, int b, int c)
 void print_hex(uint32_t num)
 {
     std::cout << std::setfill('0') << std::setw(8) << std::hex << num << '\n';
+}
+
+float convert_num_to_new_range(float old_low, float old_high, float new_low, float new_high, float num)
+{
+    float old_range = (old_high - old_low);
+    float new_range = (new_high - new_low);
+    return (((num - old_low) * new_range) / old_range) + new_low;
 }
 
 // Assume p0, p1 and p2 are listed in CCW order, and we're using a right-hand coordinate system.
@@ -256,10 +265,6 @@ void draw_triangle(const vec3& p0, const vec3& p1, const vec3& p2, Frame& frame,
 
 void draw_triangle_simple(const std::vector<vec3>& vertices, const std::vector<vec3>& colors, Frame& frame, float* z_buffer)
 {
-    colors[0].print();
-    colors[1].print();
-    colors[2].print();
-
     vec3 p0 = vertices[0];
     vec3 p1 = vertices[1];
     vec3 p2 = vertices[2];
@@ -327,15 +332,6 @@ void draw_triangle_simple(const std::vector<vec3>& vertices, const std::vector<v
                     // Replace it and color that pixel in.
                     z_buffer[i + (j * frame.w)] = z;
                     frame.set_pixel(i, j, interpolated_colors);
-
-                    if (w0 == 1)
-                    {
-                        std::cout << "w0 == 1" << std::endl;
-                        color.print();
-                        std::cout << "i: " << i << std::endl;
-                        std::cout << "j: " << j << std::endl;
-                        print_hex(interpolated_colors);
-                    }
                 }
             }
         }
@@ -517,12 +513,77 @@ int main() {
     colors.push_back(vec3(0, 255, 0));
     colors.push_back(vec3(0, 0, 255));
 
+#ifdef PERSPECTIVE
+    std::vector<vec3> vertices;
+    vertices.push_back((vec3(0.1, 0.1, 1.2)));
+    vertices.push_back((vec3(0.4, 0.2, 1)));
+    vertices.push_back((vec3(0.2, 0.4, 0.7)));
+
+    std::vector<vec3> transformed;
+
+    for (const vec3& vertex : vertices)
+    {
+        float vx = vertex.x;
+        float vy = vertex.y;
+        float vz = vertex.z;
+        vec4 clip = mvp * vec4(vx, vy, vz, 1);
+        vec4 screen = clip / clip.w; // Perspective divide.
+        vec3 viewport_coord = (viewport * screen);
+        viewport_coord.x = (int) viewport_coord.x;
+        viewport_coord.y = (int) viewport_coord.y;
+        transformed.push_back(viewport_coord);
+    } 
+
+    draw_triangle_simple(transformed, colors, frame, z_buffer);
+
+#ifdef ZBUFFER
+    float old_low = std::numeric_limits<float>::max();
+    float old_high = std::numeric_limits<float>::lowest();
+
+    for (int i = 0; i < frame.w; i++)
+    {
+        for (int j = 0; j < frame.h; j++)
+        {
+            old_low = std::min(old_low, z_buffer[i+(j*frame.w)]);
+            if (z_buffer[i+(j*frame.w)] != std::numeric_limits<float>::max())
+            {
+                old_high = std::max(old_high, z_buffer[i+(j*frame.w)]);
+            }
+        }
+    }
+
+    std::cout << old_low << std::endl;
+    std::cout << old_high << std::endl;
+
+    // Draw zbuffer
+    for (int i = 0; i < frame.w; i++)
+    {
+        for (int j = 0; j < frame.h; j++)
+        {
+            float old_z = z_buffer[i+(j*frame.w)];
+            float z = 0.0f;
+            if (old_z != std::numeric_limits<float>::max())
+            {
+                z = convert_num_to_new_range(old_low, old_high, 0.0f, 255.0f, old_z);
+            }
+            if (z != 0.0f)
+            {
+                std::cout << "z: " << z << std::endl;
+            }
+            // zbuffer is operating in reverse since conversion to ndcs, flip for better visual representation
+            z = -z;
+            // note that darker = farther away from the camera, redder = closer to the camera.
+            frame.set_pixel(i, j, SDL_MapRGBA(pixel_format, z, 0, 0, 255));
+        }
+    }
+#endif
+#else
     std::vector<vec3> vertices;
     vertices.push_back(vec3(100, 100, 0));
     vertices.push_back(vec3(700, 100, 0));
     vertices.push_back(vec3(400, 700, 0));
-
     draw_triangle_simple(vertices, colors, frame, z_buffer);
+#endif 
 
     #ifdef MODEL
 
