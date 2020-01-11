@@ -56,9 +56,12 @@ void Frame::set_pixel(int x, int y, uint32_t color)
 
 void Frame::flip_image_on_x_axis()
 {
-    for (int i = 0; i < (w/2)*h; i++)
+    for (int j = 0; j < h/2; j++)
     {
-        std::swap(buffer[i], buffer[(w*h)-1-i]);
+        for (int i = 0; i < w; i++)
+        {
+            std::swap(buffer[(j*w) + i], buffer[(h-j)*w +i]); 
+        }
     }
 }
 

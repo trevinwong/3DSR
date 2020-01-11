@@ -12,7 +12,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "../lib/stb_image.h"
 
-#define PERSPECTIVE
+// #define PERSPECTIVE
 
 #include "vec2.h"
 #include "vec3.h"
@@ -25,8 +25,9 @@
 #include "SDL.h"
 
 // TODO: Refactor this later. Assumed to be RGBA
-struct Texture
+class Texture
 {
+public:
     Texture() = default;
     int width, height, channels;
     unsigned char* data;
@@ -255,7 +256,90 @@ void draw_triangle(const vec3& p0, const vec3& p1, const vec3& p2, Frame& frame,
 
 void draw_triangle_simple(const std::vector<vec3>& vertices, const std::vector<vec3>& colors, Frame& frame, float* z_buffer)
 {
-    draw_triangle(vertices[0], vertices[1], vertices[2], frame, z_buffer, vec2(), vec2(), vec2(), Texture(), std::vector<float>(), 0, colors);
+    colors[0].print();
+    colors[1].print();
+    colors[2].print();
+
+    vec3 p0 = vertices[0];
+    vec3 p1 = vertices[1];
+    vec3 p2 = vertices[2];
+
+    vec2 edge0 = (p1 - p0);
+    vec2 edge1 = (p2 - p1);
+    vec2 edge2 = (p0 - p2);
+
+    // Get the bounding box of these points.
+    int min_x = min3(p0.x, p1.x, p2.x);
+    int max_x = max3(p0.x, p1.x, p2.x);
+    int min_y = min3(p0.y, p1.y, p2.y);
+    int max_y = max3(p0.y, p1.y, p2.y);
+
+    // Clip against the screen.
+    min_x = std::max(min_x, 0);
+    max_x = std::min(max_x, frame.w - 1);
+    min_y = std::max(min_y, 0);
+    max_y = std::min(max_y, frame.h - 1);
+
+    // Iterate through all pixels inside the bounding box.
+    for (int i = min_x; i <= max_x; i++)
+    {
+        for (int j = min_y; j <= max_y; j++)
+        {
+            vec2 to_point_from_p0 = vec2(i, j) - vec2(p0);
+            vec2 to_point_from_p1 = vec2(i, j) - vec2(p1);
+            vec2 to_point_from_p2 = vec2(i, j) - vec2(p2);
+
+            float v0v1p = cross_2d(edge0, to_point_from_p0); 
+            float v1v2p = cross_2d(edge1, to_point_from_p1); 
+            float v2v0p = cross_2d(edge2, to_point_from_p2); 
+
+            if (v0v1p >= 0 && v1v2p >= 0 && v2v0p >= 0)
+            {
+                float v0v1v2 = cross_2d(p1 - p0, p2 - p0);
+
+                if (v0v1v2 == 0) return;
+
+                float w0 = v1v2p / v0v1v2; // corresponds to the weight of p0
+                float w1 = v2v0p / v0v1v2; // corresponds to the weight of p1
+                float w2 = v0v1p / v0v1v2; // corresponds to the weight of p2
+
+                // Get z value by interpolating from each vertice using the barycentric coordinates.
+                float z = 0;
+                z += (w0 * p0.z);
+                z += (w1 * p1.z);
+                z += (w2 * p2.z);
+
+                // Interpolate vertex colors.
+                vec3 color;
+                color += (colors[0] * w0);
+                color += (colors[1] * w1);
+                color += (colors[2] * w2);
+
+                uint32_t interpolated_colors = SDL_MapRGBA(pixel_format, color.x, color.y, color.z, 255);
+
+                // If the z-value of the pixel we're on is greater than our current stored z-buffer's value...
+                #ifdef PERSPECTIVE
+                if (z < z_buffer[i + (j * frame.w)])
+                #else
+                if (z > z_buffer[i + (j * frame.w)])
+                #endif
+                {
+                    // Replace it and color that pixel in.
+                    z_buffer[i + (j * frame.w)] = z;
+                    frame.set_pixel(i, j, interpolated_colors);
+
+                    if (w0 == 1)
+                    {
+                        std::cout << "w0 == 1" << std::endl;
+                        color.print();
+                        std::cout << "i: " << i << std::endl;
+                        std::cout << "j: " << j << std::endl;
+                        print_hex(interpolated_colors);
+                    }
+                }
+            }
+        }
+    }
 }
 
 // Constructs a view matrix given the position of the eye and the target.
@@ -433,7 +517,12 @@ int main() {
     colors.push_back(vec3(0, 255, 0));
     colors.push_back(vec3(0, 0, 255));
 
-    draw_triangle()
+    std::vector<vec3> vertices;
+    vertices.push_back(vec3(100, 100, 0));
+    vertices.push_back(vec3(700, 100, 0));
+    vertices.push_back(vec3(400, 700, 0));
+
+    draw_triangle_simple(vertices, colors, frame, z_buffer);
 
     #ifdef MODEL
 
