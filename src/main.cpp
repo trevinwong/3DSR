@@ -136,7 +136,7 @@ float convert_num_to_new_range(float old_low, float old_high, float new_low, flo
 
 // Assume p0, p1 and p2 are listed in CCW order, and we're using a right-hand coordinate system.
 // TODO: Clean up parameters.
-void draw_triangle(const vec3& p0, const vec3& p1, const vec3& p2, Frame& frame, float* z_buffer, const vec2& t0, const vec2& t1, const vec2& t2, const Texture& texture, const std::vector<float>& intensities, uint32_t color, const std::vector<vec3>& vertex_colors)
+void draw_triangle(vec3 p0, vec3 p1, vec3 p2, Frame& frame, float* z_buffer, vec2 t0, vec2 t1, vec2 t2, Texture texture, std::vector<float> intensities, uint32_t color, std::vector<vec3> vertex_colors)
 {
     /* p0.print(); */
     /* p1.print(); */
@@ -191,15 +191,18 @@ void draw_triangle(const vec3& p0, const vec3& p1, const vec3& p2, Frame& frame,
                 // Calculate barycentric coordinates. We can leave out the division by 2 since we're just getting the ratio between the sub-triangle and the triangle.
                 // TODO: Be careful about dividing by 0.
                 // aka check for degenerate triangles first?
-                float w0 = v0v1p / v0v1v2; // corresponds to the weight of p2
-                float w1 = v1v2p / v0v1v2; // corresponds to the weight of p0
-                float w2 = v2v0p / v0v1v2; // corresponds to the weight of p1
+                float w0 = v1v2p / v0v1v2; // corresponds to the weight of p0
+                float w1 = v2v0p / v0v1v2; // corresponds to the weight of p1
+                float w2 = v0v1p / v0v1v2; // corresponds to the weight of p2
 
-                // Get z value by interpolating from each vertice using the barycentric coordinates.
-                float z = 0;
-                z += (w0 * p2.z);
-                z += (w1 * p0.z);
-                z += (w2 * p1.z);
+                // We can only linearly interpolate for inverted z using barycentric coordinates
+                // https://www.scratchapixel.com/lessons/3d-basic-rendering/rasterization-practical-implementation/visibility-problem-depth-buffer-depth-interpolation
+                float inverted_z = 0;
+                inverted_z += (w0 * 1/p0.z);
+                inverted_z += (w1 * 1/p1.z);
+                inverted_z += (w2 * 1/p2.z);
+
+                float z = 1/inverted_z;
 
                 // Interpolate the value for u, v as well.
                 // TODO: should we have a specific syntax for zero initializing vectors?
@@ -208,40 +211,54 @@ void draw_triangle(const vec3& p0, const vec3& p1, const vec3& p2, Frame& frame,
                 /* t0.print(); */
                 /* t1.print(); */
                 /* std::cout << "w0: " << w0 << " w1: " << w1 << " w2: " << w2 << std::endl; */
-                uv += (t2 * w0);
-                uv += (t0 * w1);
-                uv += (t1 * w2);
+                /* t0 /= p0.z; */
+                /* t1 /= p1.z; */
+                /* t2 /= p2.z; */
+
+                uv += (t0 * w0);
+                uv += (t1 * w1);
+                uv += (t2 * w2);
+
+                /* uv *= z; */
 
                 // Interpolate the intensity of the color.
                 float intensity = 0;
-                intensity += (intensities[2] * w0);
-                intensity += (intensities[0] * w1);
-                intensity += (intensities[1] * w2);
+
+                /* intensities[0] /= p0.z; */
+                /* intensities[1] /= p1.z; */
+                /* intensities[2] /= p2.z; */
+
+                intensity += (intensities[0] * w0);
+                intensity += (intensities[1] * w1);
+                intensity += (intensities[2] * w2);
+                
+                /* intensity *= z; */
 
                 // Interpolate vertex colors.
                 vec3 color;
-                color += (vertex_colors[2] * w0);
-                color += (vertex_colors[0] * w1);
-                color += (vertex_colors[1] * w2);
 
-                /* std::cout << "intensities[2]: " << intensities[2] * w0 << std::endl; */
-                /* std::cout << "intensities[0]: " << intensities[0] * w1 << std::endl; */
-                /* std::cout << "intensities[1]: " << intensities[1] * w2 << std::endl; */
-                /* std::cout << "intensity: " << intensity << std::endl; */
+                vertex_colors[0] /= p0.z;
+                vertex_colors[1] /= p1.z;
+                vertex_colors[2] /= p2.z;
 
-                // Pass in the texture.
+                color += (vertex_colors[0] * w0);
+                color += (vertex_colors[1] * w1);
+                color += (vertex_colors[2] * w2);
+
+                color *= z;
+
                 // The u,v coordinates HAVE to be floored before indexing the texture color with them!
-                uv.x = std::floor(uv.x * texture.width);
-                uv.y = std::floor(uv.y * texture.height);
+                uint32_t u = (uint32_t) std::floor(uv.x * texture.width);
+                uint32_t v = (uint32_t) std::floor(uv.y * texture.width);
  
                 // Sample the color at uv.x and uv.y.
                 // Nice way of sampling borrowed from NotCamelCase/SoftLit.
                 // TODO: Abstract getting texture color (won't always be in RGB fashion)
                 // TODO: Texture seems a little redder than it should be. Investigate. Try rendering a quad with the texture.
-                int idx = ((uv.y * texture.width) + uv.x) * texture.channels;
+                int idx = ((v * texture.width) + u) * texture.channels;
                 float r = (float) texture.data[idx++];
-                float b = (float) texture.data[idx++];
                 float g = (float) texture.data[idx++];
+                float b = (float) texture.data[idx++];
                 uint32_t texture_color = SDL_MapRGBA(pixel_format, r, g, b, 255);
                 uint32_t texture_shaded_color = SDL_MapRGBA(pixel_format, r * intensity, g * intensity, b * intensity, 255);
                 uint32_t gouraud_color = SDL_MapRGBA(pixel_format, intensity * 255, intensity * 255, intensity * 255, 255);
@@ -256,7 +273,7 @@ void draw_triangle(const vec3& p0, const vec3& p1, const vec3& p2, Frame& frame,
                 {
                     // Replace it and color that pixel in.
                     z_buffer[i + (j * frame.w)] = z;
-                    frame.set_pixel(i, j, interpolated_colors);
+                    frame.set_pixel(i, j, texture_shaded_color);
                 }
             }
         }
@@ -447,10 +464,11 @@ int main() {
 
     // Create a light.
     // TODO: The light distance should affect the intensity of the shading...
-    vec3 light_dir(1, 1, 1);
+    vec3 light_dir(1, -1, 1);
+    light_dir.normalize_inplace();
 
     // Create an eye.
-    vec3 eye(0, 0, 2);
+    vec3 eye(1, 1, 3);
     
     float t = 1.0f;
     float b = -t;
@@ -678,9 +696,9 @@ int main() {
 
                 // We can obtain the vertex index by calling idx.normal_index.
                 // All normals are listed in a linear array, so our stride is 3 (x,y,z)
-                tinyobj::real_t nx = attrib.vertices[3*idx.normal_index + 0];
-                tinyobj::real_t ny = attrib.vertices[3*idx.normal_index + 1];
-                tinyobj::real_t nz = attrib.vertices[3*idx.normal_index + 2];
+                tinyobj::real_t nx = attrib.normals[3*idx.normal_index + 0];
+                tinyobj::real_t ny = attrib.normals[3*idx.normal_index + 1];
+                tinyobj::real_t nz = attrib.normals[3*idx.normal_index + 2];
                 normals.push_back(vec3(nx, ny, nz));
 
                 // Textures.
@@ -704,26 +722,26 @@ int main() {
                 // Calculate the intensities of each vertex by using the normals.
                 std::vector<float> intensities;
 
+                // For point light
+                // We may need to normalize the world_coords.
                 vec3 to_light_v0 = light_dir - world_coords[0];
                 vec3 to_light_v1 = light_dir - world_coords[1];
                 vec3 to_light_v2 = light_dir - world_coords[2];
 
-                float dist0 = to_light_v0.length();
-                float dist1 = to_light_v1.length();
-                float dist2 = to_light_v2.length();
+                /* to_light_v0.print(); */
+                /* to_light_v1.print(); */
+                /* to_light_v2.print(); */
 
-                to_light_v0.normalize_inplace();
-                to_light_v1.normalize_inplace();
-                to_light_v2.normalize_inplace();
-
-                normals[0].normalize_inplace();
-                normals[1].normalize_inplace();
-                normals[2].normalize_inplace();
+                /* normals[0].print(); */
+                /* normals[1].print(); */
+                /* normals[2].print(); */
 
                 // Set to 0.1f for ambient lighting.
-                float intensity0 = std::max(dot(normals[0], to_light_v0), 0.1f);
-                float intensity1 = std::max(dot(normals[1], to_light_v1), 0.1f);
-                float intensity2 = std::max(dot(normals[2], to_light_v2), 0.1f); 
+                // We use light_dir for directional light.
+                // TODO: do we need to normalize the normals too?
+                float intensity0 = std::max(dot(normals[0], light_dir), 0.1f);
+                float intensity1 = std::max(dot(normals[1], light_dir), 0.1f);
+                float intensity2 = std::max(dot(normals[2], light_dir), 0.1f); 
 
                 // Attenuation.
                 // This makes the model really dark though. Apparently quadratic attenuation is rarely used so the formula is:

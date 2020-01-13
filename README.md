@@ -59,17 +59,21 @@ Fun fact: you don't need to specify the exact path of where the header lives, as
 13. ~~Occlusion culling using a z-buffer.~~
 14. ~~Perspective projection.~~
 15. ~~Back-face culling.~~
-16. ~~Frustum culling.~~ (To be done later, possibly. We only have 1 model at a time so frustum culling isn't really necessary.)
-17. ~~Frustum clipping.~~ (done? technically. clipping is done inside rasterization)
-18. Moving the camera.
 
 ### Shaders and Light
 
-19. ~~Texture mapping.~~
-20. ~~Perspective-correct interpolated barycentric coordinates and depth.~~
+18. ~~Texture mapping.~~
+19. ~~Perspective-correct interpolated barycentric coordinates and depth.~~
 20. Perspective-correct interpolated normals.
-21. ~~Gouraud shading.~~ (should be done, although not having perspective-correct interpolated normals may cause it to look a little weird)
+21. ~~Gouraud shading.~~ 
 22. Phong shading.
+
+### Usability
+
+23. Add key bindings for rotating the camera.
+24. Add key bindings for switching to different shaders. (add abstraction for shaders, possibly)
+25. Add text describing model name, FPS and triangles. (inspired by JamesGriffin repo)
+26. Add checkboard texture. (inspired by JamesGirffin repo)
 
 ## House-keeping
 
@@ -85,10 +89,18 @@ Fun fact: you don't need to specify the exact path of where the header lives, as
 - Optimization.
 - Clean up code. A lot.
 
+## Maybe's
+
+- Frustum culling. (not really necessary since we only have 1 model at a time)
+- Frustum clipping. (i.e clipping before entering the rasterization algorithm)
+- Mipmaps.
+- Shadow mapping.
+
 ## Lessons
 
 - Be wary of where your cross product vector points. Place your thumb in the direction of the first vector and your index finger in the direction of the second vector. Your middle finger should be perpendicular and show the direction of the cross product vector. Remember to do this with the appropriate handedness of your coordinate system (left-hand/right-hand).
 - Be careful of using `std::numeric_limits<float>::min()` since this will give you the lowest possible POSITIVE value. Use `std::numeric_limits<float>::lowest()` instead.
+- Be careful with loading data. For example, with `tinyobjloader`: make sure you're indexing into `attrib.normals` with the `normal_index` to get the normals.
 
 ## References
 
