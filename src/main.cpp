@@ -13,7 +13,7 @@
 #include "../lib/stb_image.h"
 
 #define PERSPECTIVE
-// #define MODEL
+#define MODEL
 // #define ZBUFFER
 
 #include "vec2.h"
@@ -309,16 +309,38 @@ void draw_triangle_simple(const std::vector<vec3>& vertices, const std::vector<v
                 float w2 = v0v1p / v0v1v2; // corresponds to the weight of p2
 
                 // Get z value by interpolating from each vertice using the barycentric coordinates.
-                float z = 0;
-                z += (w0 * p0.z);
-                z += (w1 * p1.z);
-                z += (w2 * p2.z);
+                // Should no longer work with perspective.
+                /* float z = 0; */
+                /* z += (w0 * p0.z); */
+                /* z += (w1 * p1.z); */
+                /* z += (w2 * p2.z); */
+
+                // We can only linearly interpolate for inverted z using barycentric coordinates
+                // https://www.scratchapixel.com/lessons/3d-basic-rendering/rasterization-practical-implementation/visibility-problem-depth-buffer-depth-interpolation
+                float inverted_z = 0;
+                inverted_z += (w0 * 1/p0.z);
+                inverted_z += (w1 * 1/p1.z);
+                inverted_z += (w2 * 1/p2.z);
+
+                float z = 1/inverted_z;
+
+                // First divide vertex color attribute by z
+                vec3 color0 = colors[0];
+                vec3 color1 = colors[1];
+                vec3 color2 = colors[2];
+
+                color0 /= p0.z;
+                color1 /= p1.z;
+                color2 /= p2.z;
 
                 // Interpolate vertex colors.
                 vec3 color;
-                color += (colors[0] * w0);
-                color += (colors[1] * w1);
-                color += (colors[2] * w2);
+                color += (color0 * w0);
+                color += (color1 * w1);
+                color += (color2 * w2);
+
+                // Multiply the result by the z of the pixel
+                color *= z;
 
                 uint32_t interpolated_colors = SDL_MapRGBA(pixel_format, color.x, color.y, color.z, 255);
 
@@ -513,11 +535,12 @@ int main() {
     colors.push_back(vec3(0, 255, 0));
     colors.push_back(vec3(0, 0, 255));
 
+#ifndef MODEL
 #ifdef PERSPECTIVE
     std::vector<vec3> vertices;
-    vertices.push_back((vec3(0.1, 0.1, 1.2)));
-    vertices.push_back((vec3(0.4, 0.2, 1)));
-    vertices.push_back((vec3(0.2, 0.4, 0.7)));
+    vertices.push_back((vec3(0.1, 0.2, 0.8)));
+    vertices.push_back((vec3(0.5, 0.2, 0.5)));
+    vertices.push_back((vec3(0.3, 0.4, 1)));
 
     std::vector<vec3> transformed;
 
@@ -570,9 +593,6 @@ int main() {
             {
                 std::cout << "z: " << z << std::endl;
             }
-            // zbuffer is operating in reverse since conversion to ndcs, flip for better visual representation
-            z = -z;
-            // note that darker = farther away from the camera, redder = closer to the camera.
             frame.set_pixel(i, j, SDL_MapRGBA(pixel_format, z, 0, 0, 255));
         }
     }
@@ -584,6 +604,7 @@ int main() {
     vertices.push_back(vec3(400, 700, 0));
     draw_triangle_simple(vertices, colors, frame, z_buffer);
 #endif 
+#endif
 
     #ifdef MODEL
 

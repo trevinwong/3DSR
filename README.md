@@ -59,16 +59,17 @@ Fun fact: you don't need to specify the exact path of where the header lives, as
 13. ~~Occlusion culling using a z-buffer.~~
 14. ~~Perspective projection.~~
 15. ~~Back-face culling.~~
-16. Frustum culling.
-17. Moving the camera.
+16. ~~Frustum culling.~~ (To be done later, possibly. We only have 1 model at a time so frustum culling isn't really necessary.)
+17. ~~Frustum clipping.~~ (done? technically. clipping is done inside rasterization)
+18. Moving the camera.
 
 ### Shaders and Light
 
-18. ~~Texture mapping.~~
-19. Perspective-correct interpolated normals.
-21. Gouraud shading.
+19. ~~Texture mapping.~~
+20. ~~Perspective-correct interpolated barycentric coordinates and depth.~~
+20. Perspective-correct interpolated normals.
+21. ~~Gouraud shading.~~ (should be done, although not having perspective-correct interpolated normals may cause it to look a little weird)
 22. Phong shading.
-23. Shadow maps.
 
 ## House-keeping
 
@@ -82,6 +83,7 @@ Fun fact: you don't need to specify the exact path of where the header lives, as
 - Look into a better interface to load models with.
 - Displaying FPS.
 - Optimization.
+- Clean up code. A lot.
 
 ## Lessons
 
