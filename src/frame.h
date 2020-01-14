@@ -16,6 +16,7 @@ class Frame
         Frame(Frame&& other) noexcept;
         Frame& operator=(Frame&& other) noexcept;
         ~Frame();
+        void fill_frame_with_color(uint32_t color);
         void set_pixel(int x, int y, uint32_t color);
         void flip_image_on_x_axis();
     private:

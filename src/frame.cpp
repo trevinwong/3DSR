@@ -42,6 +42,15 @@ Frame::~Frame()
     delete[] buffer;
 }
 
+void Frame::fill_frame_with_color(uint32_t color)
+{
+    for (int i = 0; i < w*h; i++)
+    {
+        uint32_t* ptr = buffer + i;
+        *ptr = color;
+    }
+}
+
 void Frame::set_pixel(int x, int y, uint32_t color)
 {
     // The buffer contains each row of the frame in a linear order.

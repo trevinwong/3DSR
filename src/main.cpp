@@ -136,7 +136,7 @@ float convert_num_to_new_range(float old_low, float old_high, float new_low, flo
 
 // Assume p0, p1 and p2 are listed in CCW order, and we're using a right-hand coordinate system.
 // TODO: Clean up parameters.
-void draw_triangle(vec3 p0, vec3 p1, vec3 p2, Frame& frame, float* z_buffer, vec2 t0, vec2 t1, vec2 t2, Texture texture, std::vector<float> intensities, uint32_t color, std::vector<vec3> vertex_colors)
+void draw_triangle(vec4 p0, vec4 p1, vec4 p2, Frame& frame, float* z_buffer, std::vector<vec2> uvs, Texture texture, std::vector<float> intensities, uint32_t color, std::vector<vec3> vertex_colors)
 {
     /* p0.print(); */
     /* p1.print(); */
@@ -197,42 +197,44 @@ void draw_triangle(vec3 p0, vec3 p1, vec3 p2, Frame& frame, float* z_buffer, vec
 
                 // We can only linearly interpolate for inverted z using barycentric coordinates
                 // https://www.scratchapixel.com/lessons/3d-basic-rendering/rasterization-practical-implementation/visibility-problem-depth-buffer-depth-interpolation
-                float inverted_z = 0;
-                inverted_z += (w0 * 1/p0.z);
-                inverted_z += (w1 * 1/p1.z);
-                inverted_z += (w2 * 1/p2.z);
+                float inverted_z = 0.0f;
+                inverted_z += (w0 * (1.0f/p0.w));
+                inverted_z += (w1 * (1.0f/p1.w));
+                inverted_z += (w2 * (1.0f/p2.w));
 
-                float z = 1/inverted_z;
+                float z = (1.0f/inverted_z);
 
-                // Interpolate the value for u, v as well.
-                // TODO: should we have a specific syntax for zero initializing vectors?
                 vec2 uv;
-                /* t2.print(); */
-                /* t0.print(); */
-                /* t1.print(); */
-                /* std::cout << "w0: " << w0 << " w1: " << w1 << " w2: " << w2 << std::endl; */
-                /* t0 /= p0.z; */
-                /* t1 /= p1.z; */
-                /* t2 /= p2.z; */
+                vec2 uv0 = uvs[0];
+                vec2 uv1 = uvs[1];
+                vec2 uv2 = uvs[2];
 
-                uv += (t0 * w0);
-                uv += (t1 * w1);
-                uv += (t2 * w2);
+                uv0 /= p0.w;
+                uv1 /= p1.w;
+                uv2 /= p2.w;
 
-                /* uv *= z; */
+                uv += (uv0 * w0);
+                uv += (uv1 * w1);
+                uv += (uv2 * w2);
+
+                uv *= z;
 
                 // Interpolate the intensity of the color.
                 float intensity = 0;
 
-                /* intensities[0] /= p0.z; */
-                /* intensities[1] /= p1.z; */
-                /* intensities[2] /= p2.z; */
+                float intensity0 = intensities[0];
+                float intensity1 = intensities[1];
+                float intensity2 = intensities[2];
 
-                intensity += (intensities[0] * w0);
-                intensity += (intensities[1] * w1);
-                intensity += (intensities[2] * w2);
+                intensity0 /= p0.w;
+                intensity1 /= p1.w;
+                intensity2 /= p2.w;
+
+                intensity += (intensity0 * w0);
+                intensity += (intensity1 * w1);
+                intensity += (intensity2 * w2);
                 
-                /* intensity *= z; */
+                intensity *= z;
 
                 // Interpolate vertex colors.
                 vec3 color;
@@ -254,7 +256,6 @@ void draw_triangle(vec3 p0, vec3 p1, vec3 p2, Frame& frame, float* z_buffer, vec
                 // Sample the color at uv.x and uv.y.
                 // Nice way of sampling borrowed from NotCamelCase/SoftLit.
                 // TODO: Abstract getting texture color (won't always be in RGB fashion)
-                // TODO: Texture seems a little redder than it should be. Investigate. Try rendering a quad with the texture.
                 int idx = ((v * texture.width) + u) * texture.channels;
                 float r = (float) texture.data[idx++];
                 float g = (float) texture.data[idx++];
@@ -280,7 +281,7 @@ void draw_triangle(vec3 p0, vec3 p1, vec3 p2, Frame& frame, float* z_buffer, vec
     }
 }
 
-void draw_triangle_simple(const std::vector<vec3>& vertices, const std::vector<vec3>& colors, Frame& frame, float* z_buffer)
+void draw_triangle_simple(const std::vector<vec3>& vertices, const std::vector<vec3>& colors, Frame& frame, float* z_buffer, std::vector<vec2> uvs, Texture& texture)
 {
     vec3 p0 = vertices[0];
     vec3 p1 = vertices[1];
@@ -327,39 +328,67 @@ void draw_triangle_simple(const std::vector<vec3>& vertices, const std::vector<v
 
                 // Get z value by interpolating from each vertice using the barycentric coordinates.
                 // Should no longer work with perspective.
-                /* float z = 0; */
-                /* z += (w0 * p0.z); */
-                /* z += (w1 * p1.z); */
-                /* z += (w2 * p2.z); */
+                float z = 0;
+                z += (w0 * p0.z);
+                z += (w1 * p1.z);
+                z += (w2 * p2.z);
 
-                // We can only linearly interpolate for inverted z using barycentric coordinates
-                // https://www.scratchapixel.com/lessons/3d-basic-rendering/rasterization-practical-implementation/visibility-problem-depth-buffer-depth-interpolation
+#ifdef PERSPECTIVE
                 float inverted_z = 0;
                 inverted_z += (w0 * 1/p0.z);
                 inverted_z += (w1 * 1/p1.z);
                 inverted_z += (w2 * 1/p2.z);
 
-                float z = 1/inverted_z;
+                z = 1/inverted_z;
+#endif
+                vec3 color;
+                vec2 uv;
 
-                // First divide vertex color attribute by z
                 vec3 color0 = colors[0];
                 vec3 color1 = colors[1];
                 vec3 color2 = colors[2];
+                
+                vec2 uv0 = uvs[0];
+                vec2 uv1 = uvs[1];
+                vec2 uv2 = uvs[2];
 
+#ifdef PERSPECTIVE
                 color0 /= p0.z;
                 color1 /= p1.z;
                 color2 /= p2.z;
 
+                uv0 /= p0.z;
+                uv1 /= p1.z;
+                uv2 /= p2.z;
+#endif
                 // Interpolate vertex colors.
-                vec3 color;
                 color += (color0 * w0);
                 color += (color1 * w1);
                 color += (color2 * w2);
 
+                uv += (uv0 * w0);
+                uv += (uv1 * w1);
+                uv += (uv2 * w2);
+#ifdef PERSPECTIVE
                 // Multiply the result by the z of the pixel
                 color *= z;
+                uv *= z;
+#endif
+
+                // The u,v coordinates HAVE to be floored before indexing the texture color with them!
+                uint32_t u = (uint32_t) std::floor(uv.x * texture.width);
+                uint32_t v = (uint32_t) std::floor(uv.y * texture.width);
+ 
+                // Sample the color at uv.x and uv.y.
+                // Nice way of sampling borrowed from NotCamelCase/SoftLit.
+                // TODO: Abstract getting texture color (won't always be in RGB fashion)
+                int idx = ((v * texture.width) + u) * texture.channels;
+                float r = (float) texture.data[idx++];
+                float g = (float) texture.data[idx++];
+                float b = (float) texture.data[idx++];
 
                 uint32_t interpolated_colors = SDL_MapRGBA(pixel_format, color.x, color.y, color.z, 255);
+                uint32_t texture_color = SDL_MapRGBA(pixel_format, r, g, b, 255);
 
                 // If the z-value of the pixel we're on is greater than our current stored z-buffer's value...
                 #ifdef PERSPECTIVE
@@ -370,7 +399,7 @@ void draw_triangle_simple(const std::vector<vec3>& vertices, const std::vector<v
                 {
                     // Replace it and color that pixel in.
                     z_buffer[i + (j * frame.w)] = z;
-                    frame.set_pixel(i, j, interpolated_colors);
+                    frame.set_pixel(i, j, texture_color);
                 }
             }
         }
@@ -441,6 +470,7 @@ int main() {
     
     // Create a Frame object, which allocates a buffer to draw to.
     Frame frame(WINDOW_WIDTH, WINDOW_HEIGHT);
+    frame.fill_frame_with_color(0xADD8E6);
     
     // Load our object.
     // monkey_flat.obj only specifies vertices, normals and faces.
@@ -523,6 +553,7 @@ int main() {
     int width, height, channels;
     stbi_set_flip_vertically_on_load(true);
     unsigned char* data = stbi_load("img/african_head_diffuse.tga", &width, &height, &channels, 0);
+    /* unsigned char* data = stbi_load("img/checkerboard.png", &width, &height, &channels, 3); */
     if (data == nullptr)
     {
         // Just crash if we can't load the texture.
@@ -533,7 +564,7 @@ int main() {
     Texture texture;
     texture.width = width;
     texture.height = height;
-    texture.channels = channels;
+    texture.channels = 3;
     texture.data = data;
 
     // Time to draw the mesh. 
@@ -553,12 +584,18 @@ int main() {
     colors.push_back(vec3(0, 255, 0));
     colors.push_back(vec3(0, 0, 255));
 
+    std::vector<vec2> uvs;
+    uvs.push_back(vec2(0, 0));
+    uvs.push_back(vec2(1, 0));
+    uvs.push_back(vec2(0, 1));
+
 #ifndef MODEL
 #ifdef PERSPECTIVE
     std::vector<vec3> vertices;
-    vertices.push_back((vec3(0.1, 0.2, 0.8)));
-    vertices.push_back((vec3(0.5, 0.2, 0.5)));
-    vertices.push_back((vec3(0.3, 0.4, 1)));
+    vertices.push_back((vec3(0.1*2, 0.2*2, 0.8)));
+    vertices.push_back((vec3(0.5*2, 0.2*2, 1)));
+    vertices.push_back((vec3(0.3*2, 0.4*2, 0.5)));
+
 
     std::vector<vec3> transformed;
 
@@ -575,7 +612,7 @@ int main() {
         transformed.push_back(viewport_coord);
     } 
 
-    draw_triangle_simple(transformed, colors, frame, z_buffer);
+    draw_triangle_simple(transformed, colors, frame, z_buffer, uvs, texture);
 
 #ifdef ZBUFFER
     float old_low = std::numeric_limits<float>::max();
@@ -617,10 +654,10 @@ int main() {
 #endif
 #else
     std::vector<vec3> vertices;
-    vertices.push_back(vec3(100, 100, 0));
-    vertices.push_back(vec3(700, 100, 0));
-    vertices.push_back(vec3(400, 700, 0));
-    draw_triangle_simple(vertices, colors, frame, z_buffer);
+    vertices.push_back(vec3(381, 439, 78.6035));
+    vertices.push_back(vec3(628, 400, 29.5712));
+    vertices.push_back(vec3(521, 565, 81.4573));
+    draw_triangle_simple(vertices, colors, frame, z_buffer, uvs, texture);
 #endif 
 #endif
 
@@ -637,7 +674,7 @@ int main() {
             int num_vertices = shapes[s].mesh.num_face_vertices[f];
 
             std::vector<vec3> world_coords;
-            std::vector<vec3> viewport_coords;
+            std::vector<vec4> viewport_coords;
             std::vector<vec2> texture_coords;
             std::vector<vec3> normals;
             
@@ -658,27 +695,18 @@ int main() {
 
                 world_coords.push_back(vec3(vx, vy, vz));
 
-                /* std::cout << std::endl; */
-                /* std::cout << "original coords" << std::endl; */
-                /* vec4(vx, vy, vz, 1).print(); */
-
-                /* vec4 view_coords = view * vec4(vx, vy, vz, 1); */
-                /* std::cout << "view coords" << std::endl; */
-                /* view_coords.print(); */
-
-                /* vec4 clip_coords = perspective * view_coords; */
-                /* std::cout << "clip coords" << std::endl; */
-                /* clip_coords.print(); */
-
-                /* vec4 screen_coords = clip_coords / clip_coords.w; */
-                /* std::cout << "screen coords" << std::endl; */
-                /* screen_coords.print(); */
-
                 #ifdef PERSPECTIVE
                     vec4 clip = mvp * vec4(vx, vy, vz, 1);
                     // TODO: Do some clipping here. Not sure how to reconstruct clipped triangles just yet.
                     // CHECK IF -w < x < w and -w < y < w because afer dividing by w, -1 < x < 1, same with y
                     // If we throw away the vertex what do we do? where do we reconstruct the vertex?
+                    if (clip.x < -clip.w) clip.x = -clip.w;
+                    if (clip.x > clip.w) clip.x = clip.w;
+                    if (clip.y < -clip.w) clip.y = -clip.w;
+                    if (clip.y > clip.w) clip.y = clip.w;
+                    if (clip.z < -clip.w) clip.z = -clip.w;
+                    if (clip.z > clip.w) clip.z = clip.w;
+                    float w = clip.w; // we want to keep -z cause it'll let us do perspective interpolation.
                     vec4 screen = clip / clip.w; // Perspective divide.
                 #else
                     vec4 screen = vec4(vx, vy, vz, 1); 
@@ -688,10 +716,11 @@ int main() {
                 // Big think: maybe the z thats not between -1 and 1 is clipped out? or should be clipped out, but we don't do it?
                 // Somehow offscreen vertices are being clipped out at a later process - likely at the bounds checking during rasterization
                 
-                vec3 viewport_coord = (viewport * screen);
+                vec4 viewport_coord = (viewport * screen);
                 // Need to convert to int otherwise weird black gaps will appear between triangles
                 viewport_coord.x = (int) viewport_coord.x;
                 viewport_coord.y = (int) viewport_coord.y;
+                viewport_coord.w = w;
                 viewport_coords.push_back(viewport_coord);
 
                 // We can obtain the vertex index by calling idx.normal_index.
@@ -759,7 +788,7 @@ int main() {
                 uint32_t color = SDL_MapRGBA(pixel_format, intensity * 255, intensity * 255, intensity * 255, 255);
                 
                 // draw_line(viewport_coords[0], viewport_coords[1], viewport_coords[2], frame);
-                draw_triangle(viewport_coords[0], viewport_coords[1], viewport_coords[2], frame, z_buffer, texture_coords[0], texture_coords[1], texture_coords[2], texture, intensities, color, colors);
+                draw_triangle(viewport_coords[0], viewport_coords[1], viewport_coords[2], frame, z_buffer, texture_coords, texture, intensities, color, colors);
             }   
            
             // The index at which each face begins in mesh.indices.

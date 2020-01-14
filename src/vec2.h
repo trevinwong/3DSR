@@ -19,6 +19,11 @@ class vec2
         {
         }
 
+        vec2(const vec4& v)
+            : x(v.x), y(v.y)
+        {
+        }
+
         float& operator[](int i)
         {
             return ((&x)[i]);
