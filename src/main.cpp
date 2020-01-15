@@ -274,7 +274,7 @@ void draw_triangle(vec4 p0, vec4 p1, vec4 p2, Frame& frame, float* z_buffer, std
                 {
                     // Replace it and color that pixel in.
                     z_buffer[i + (j * frame.w)] = z;
-                    frame.set_pixel(i, j, texture_shaded_color);
+                    frame.set_pixel(i, j, gouraud_color);
                 }
             }
         }
@@ -548,6 +548,8 @@ int main() {
 
     // Model-view projection matrix. Note that we don't transform the object from local coords to world coords, so there is no model matrix needed!
     mat4 mvp = perspective * view * model;
+    mat4 mv = view * model;
+    mat4 mv_transpose_inv = inverse(transpose(mv));
 
     // Load our texture.
     int width, height, channels;
@@ -728,7 +730,14 @@ int main() {
                 tinyobj::real_t nx = attrib.normals[3*idx.normal_index + 0];
                 tinyobj::real_t ny = attrib.normals[3*idx.normal_index + 1];
                 tinyobj::real_t nz = attrib.normals[3*idx.normal_index + 2];
-                normals.push_back(vec3(nx, ny, nz));
+
+                vec4 normal = vec4(nx, ny, nz, 0);
+                // When transforming vertices, we also need to transform normals, by the transpose inverse of the matrix we use.
+                // We only use the view * model matrix to do this however
+                // https://graphics.stanford.edu/courses/cs248-05/persp/persp2.html
+                normal = mv_transpose_inv * normal;
+
+                normals.push_back(vec3(normal));
 
                 // Textures.
                 tinyobj::real_t tx = attrib.texcoords[2*idx.texcoord_index+0];
@@ -768,6 +777,10 @@ int main() {
                 // Set to 0.1f for ambient lighting.
                 // We use light_dir for directional light.
                 // TODO: do we need to normalize the normals too?
+                /* float intensity0 = std::max(dot(normals[0], to_light_v0), 0.1f); */
+                /* float intensity1 = std::max(dot(normals[1], to_light_v1), 0.1f); */
+                /* float intensity2 = std::max(dot(normals[2], to_light_v2), 0.1f); */ 
+
                 float intensity0 = std::max(dot(normals[0], light_dir), 0.1f);
                 float intensity1 = std::max(dot(normals[1], light_dir), 0.1f);
                 float intensity2 = std::max(dot(normals[2], light_dir), 0.1f); 
