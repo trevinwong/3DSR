@@ -136,7 +136,7 @@ float convert_num_to_new_range(float old_low, float old_high, float new_low, flo
 
 // Assume p0, p1 and p2 are listed in CCW order, and we're using a right-hand coordinate system.
 // TODO: Clean up parameters.
-void draw_triangle(vec4 p0, vec4 p1, vec4 p2, Frame& frame, float* z_buffer, std::vector<vec2> uvs, Texture texture, std::vector<float> intensities, uint32_t color, std::vector<vec3> vertex_colors)
+void draw_triangle(vec4 p0, vec4 p1, vec4 p2, Frame& frame, float* z_buffer, std::vector<vec2> uvs, Texture texture, std::vector<float> intensities, uint32_t color, std::vector<vec3> vertex_colors, std::vector<vec3> normals, vec3 eye, vec3 light, std::vector<vec2> orig_xy)
 {
     /* p0.print(); */
     /* p1.print(); */
@@ -236,6 +236,42 @@ void draw_triangle(vec4 p0, vec4 p1, vec4 p2, Frame& frame, float* z_buffer, std
                 
                 intensity *= z;
 
+                // Interpolate normals.
+                vec3 normal;
+
+                vec3 normal0 = normals[0];
+                vec3 normal1 = normals[1];
+                vec3 normal2 = normals[2];
+
+                normal0 /= p0.w;
+                normal1 /= p1.w;
+                normal2 /= p2.w;
+
+                normal += (normal0 * w0);
+                normal += (normal1 * w1);
+                normal += (normal2 * w2);
+                
+                normal *= z;
+                normal.normalize_inplace();
+
+                // Interpolate vertex positions
+                // We need to repeat the perspective division process.
+                vec2 xy;
+
+                vec2 orig_xy0 = orig_xy[0];
+                vec2 orig_xy1 = orig_xy[1];
+                vec2 orig_xy2 = orig_xy[2];
+
+                orig_xy0 /= p0.w;
+                orig_xy1 /= p1.w;
+                orig_xy2 /= p2.w;
+
+                xy += (orig_xy0 * w0);
+                xy += (orig_xy1 * w1);
+                xy += (orig_xy2 * w2);
+                
+                xy *= z;
+
                 // Interpolate vertex colors.
                 vec3 color;
 
@@ -265,6 +301,32 @@ void draw_triangle(vec4 p0, vec4 p1, vec4 p2, Frame& frame, float* z_buffer, std
                 uint32_t gouraud_color = SDL_MapRGBA(pixel_format, intensity * 255, intensity * 255, intensity * 255, 255);
                 uint32_t interpolated_colors = SDL_MapRGBA(pixel_format, color.x, color.y, color.z, 255);
 
+                // Phong shading
+                float kd = 0.5f;
+                float ks = 0.6f;
+
+                vec3 fragment = vec3(xy.x, xy.y, z);
+                fragment.normalize_inplace();
+
+                vec3 to_eye = eye - fragment;
+                to_eye.normalize_inplace();
+                vec3 to_light = light - fragment;
+                to_light.normalize_inplace();
+                // https://www.cs.utexas.edu/~bajaj/graphics2012/cs354/lectures/lect14.pdf
+                // slide 7
+                vec3 reflected = (normal - to_light)  * (dot(normal, to_light)) * 2;
+                reflected.normalize_inplace();
+
+                float ambient = 0.1f;
+                float diffuse = std::max(dot(normal, light), 0.0f);
+                float specular = std::pow(std::max(dot(to_eye, reflected), 0.0f), 2.0f);
+                specular = std::max(std::pow(dot(to_eye, reflected), 8.0f), 0.0f);
+
+                float phong_term = ambient + (kd * diffuse) + (ks * specular);
+
+                uint32_t phong_combined = SDL_MapRGBA(pixel_format, r * phong_term, g * phong_term, b * phong_term, 255);
+                uint32_t just_phong = SDL_MapRGBA(pixel_format, std::min(phong_term * 255, 255.0f), std::min(phong_term * 255, 255.0f), std::min(phong_term * 255, 255.0f), 255);
+
                 // If the z-value of the pixel we're on is greater than our current stored z-buffer's value...
                 #ifdef PERSPECTIVE
                 if (z < z_buffer[i + (j * frame.w)])
@@ -274,7 +336,7 @@ void draw_triangle(vec4 p0, vec4 p1, vec4 p2, Frame& frame, float* z_buffer, std
                 {
                     // Replace it and color that pixel in.
                     z_buffer[i + (j * frame.w)] = z;
-                    frame.set_pixel(i, j, gouraud_color);
+                    frame.set_pixel(i, j, phong_combined);
                 }
             }
         }
@@ -494,7 +556,7 @@ int main() {
 
     // Create a light.
     // TODO: The light distance should affect the intensity of the shading...
-    vec3 light_dir(1, -1, 1);
+    vec3 light_dir(0.5, -1, 1);
     light_dir.normalize_inplace();
 
     // Create an eye.
@@ -679,6 +741,10 @@ int main() {
             std::vector<vec4> viewport_coords;
             std::vector<vec2> texture_coords;
             std::vector<vec3> normals;
+
+            std::vector<vec2> world_xy;
+            std::vector<vec2> modelview_xy;
+            std::vector<vec2> clip_xy;
             
             // All vertices are stored in counter-clockwise order by default.
             for (size_t v = 0; v < num_vertices; v++)
@@ -710,6 +776,10 @@ int main() {
                     if (clip.z > clip.w) clip.z = clip.w;
                     float w = clip.w; // we want to keep -z cause it'll let us do perspective interpolation.
                     vec4 screen = clip / clip.w; // Perspective divide.
+
+                    world_xy.push_back(vec2(vx, vy));
+                    modelview_xy.push_back(vec2(mv * vec4(vx, vy, vz, 1)));
+                    clip_xy.push_back(vec2(clip.x, clip.y));
                 #else
                     vec4 screen = vec4(vx, vy, vz, 1); 
                 #endif
@@ -801,7 +871,7 @@ int main() {
                 uint32_t color = SDL_MapRGBA(pixel_format, intensity * 255, intensity * 255, intensity * 255, 255);
                 
                 // draw_line(viewport_coords[0], viewport_coords[1], viewport_coords[2], frame);
-                draw_triangle(viewport_coords[0], viewport_coords[1], viewport_coords[2], frame, z_buffer, texture_coords, texture, intensities, color, colors);
+                draw_triangle(viewport_coords[0], viewport_coords[1], viewport_coords[2], frame, z_buffer, texture_coords, texture, intensities, color, colors, normals, eye, light_dir, clip_xy);
             }   
            
             // The index at which each face begins in mesh.indices.

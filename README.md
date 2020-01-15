@@ -64,9 +64,9 @@ Fun fact: you don't need to specify the exact path of where the header lives, as
 
 18. ~~Texture mapping.~~
 19. ~~Perspective-correct interpolated barycentric coordinates and depth.~~
-20. Perspective-correct interpolated normals.
+20. ~~Transformation of normals.~~
 21. ~~Gouraud shading.~~ 
-22. Phong shading.
+22. ~~Phong shading.~~
 
 ### Usability
 
