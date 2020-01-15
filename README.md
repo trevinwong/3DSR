@@ -73,7 +73,7 @@ Fun fact: you don't need to specify the exact path of where the header lives, as
 23. Add key bindings for rotating the camera.
 24. Add key bindings for switching to different shaders. (add abstraction for shaders, possibly)
 25. Add text describing model name, FPS and triangles. (inspired by JamesGriffin repo)
-26. Add checkboard texture. (inspired by JamesGirffin repo)
+26. Add checkerboard texture. (inspired by JamesGirffin repo)
 
 ## House-keeping
 

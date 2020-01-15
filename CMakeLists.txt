@@ -11,6 +11,7 @@ set (CMAKE_CXX_STANDARD 17)
 set(SOURCE_FILES
   src/main.cpp
   src/frame.cpp
+  src/texture.cpp
 )
 
 # Add the executable, which should be built from the given source (.cpp) files.

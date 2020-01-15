@@ -9,8 +9,6 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "../lib/tiny_obj_loader.h"
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "../lib/stb_image.h"
 
 #define PERSPECTIVE
 #define MODEL
@@ -21,19 +19,11 @@
 #include "vec4.h"
 #include "mat4.h"
 #include "frame.h"
+#include "texture.h"
 
 #define trace(var)  { std::cout << "Line " << __LINE__ << ": " << #var << "=" << var << "\n";}
 
 #include "SDL.h"
-
-// TODO: Refactor this later. Assumed to be RGBA
-class Texture
-{
-public:
-    Texture() = default;
-    int width, height, channels;
-    unsigned char* data;
-};
 
 const inline int WINDOW_WIDTH = 800;
 const inline int WINDOW_HEIGHT = 800;
@@ -614,22 +604,7 @@ int main() {
     mat4 mv_transpose_inv = inverse(transpose(mv));
 
     // Load our texture.
-    int width, height, channels;
-    stbi_set_flip_vertically_on_load(true);
-    unsigned char* data = stbi_load("img/african_head_diffuse.tga", &width, &height, &channels, 0);
-    /* unsigned char* data = stbi_load("img/checkerboard.png", &width, &height, &channels, 3); */
-    if (data == nullptr)
-    {
-        // Just crash if we can't load the texture.
-        // TODO: Refactor this.
-        std::cout << "Unable to load texture." << std::endl;
-        return 1;
-    }
-    Texture texture;
-    texture.width = width;
-    texture.height = height;
-    texture.channels = 3;
-    texture.data = data;
+    Texture texture("img/african_head_diffuse.tga");
 
     // Time to draw the mesh. 
     // Let's allocate our z-buffer.
