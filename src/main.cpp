@@ -2,13 +2,9 @@
 #include <limits>
 #include <utility>
 #include <cmath>
-#include <iomanip>
-#include <cstdint>
-#include <algorithm>
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "../lib/tiny_obj_loader.h"
-
 
 #define PERSPECTIVE
 #define MODEL
@@ -20,6 +16,7 @@
 #include "mat4.h"
 #include "frame.h"
 #include "texture.h"
+#include "utils.h"
 
 #define trace(var)  { std::cout << "Line " << __LINE__ << ": " << #var << "=" << var << "\n";}
 
@@ -102,27 +99,6 @@ float cross_2d(const vec2& a, const vec2& b)
     return (a.x * b.y) - (a.y * b.x);
 }
 
-int min3(int a, int b, int c)
-{
-    return std::min(std::min(a, b), c);
-}
-
-int max3(int a, int b, int c)
-{
-    return std::max(std::max(a, b), c);
-}
-
-void print_hex(uint32_t num)
-{
-    std::cout << std::setfill('0') << std::setw(8) << std::hex << num << '\n';
-}
-
-float convert_num_to_new_range(float old_low, float old_high, float new_low, float new_high, float num)
-{
-    float old_range = (old_high - old_low);
-    float new_range = (new_high - new_low);
-    return (((num - old_low) * new_range) / old_range) + new_low;
-}
 
 // Assume p0, p1 and p2 are listed in CCW order, and we're using a right-hand coordinate system.
 // TODO: Clean up parameters.
