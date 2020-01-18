@@ -109,6 +109,7 @@ There are a few other projects that have done the same thing, and that I have us
 - https://github.com/JamesGriffin/3D-Rasterizer
 - https://github.com/ssloy/tinyrenderer
 - https://github.com/NotCamelCase/SoftLit
+- https://github.com/karltechno/SoftRast
 
 For learning SDL2, this website has been very handy:
 

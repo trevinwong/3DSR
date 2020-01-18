@@ -3,9 +3,6 @@
 #include <utility>
 #include <cmath>
 
-#define TINYOBJLOADER_IMPLEMENTATION
-#include "../lib/tiny_obj_loader.h"
-
 #define PERSPECTIVE
 #define MODEL
 // #define ZBUFFER
@@ -17,6 +14,7 @@
 #include "frame.h"
 #include "texture.h"
 #include "utils.h"
+#include "mesh.h"
 
 #define trace(var)  { std::cout << "Line " << __LINE__ << ": " << #var << "=" << var << "\n";}
 
@@ -501,7 +499,7 @@ int main() {
     frame.fill_frame_with_color(0xADD8E6);
     
     // Load our object.
-    // monkey_flat.obj only specifies vertices, normals and faces.
+    // DEPRECATED
     std::string inputfile = "obj/african_head.obj";
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
@@ -515,6 +513,10 @@ int main() {
     if (!err.empty()) {
       std::cerr << "Error: " << err << std::endl;
     }
+
+    // Load our object.
+    Mesh mesh("obj/african_head.obj");
+
 
     if (!ret) {
       exit(1);
