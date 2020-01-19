@@ -7,12 +7,10 @@
 class vec3
 {
     public: 
-        float x = 0, y = 0, z = 0;
-
         vec3() = default;
 
-        vec3(float a, float b, float c)
-            : x(a), y(b), z(c)
+        vec3(float X, float Y, float Z)
+            : x(X), y(Y), z(Z)
         {
         }
 
@@ -39,6 +37,11 @@ class vec3
             return *this;
         }
 
+        vec3 operator*(float s) const
+        {
+            return vec3(x * s, y * s, z * s);
+        }
+
         vec3& operator/=(float s)
         {
             s = 1.0f / s;
@@ -48,8 +51,9 @@ class vec3
             return *this;
         }
 
-        vec3 operator*(float s) const
+        vec3 operator/(float s) const
         {
+            s = 1.0f / s;
             return vec3(x * s, y * s, z * s);
         }
 
@@ -79,9 +83,14 @@ class vec3
             return vec3(x - v.x, y - v.y, z - v.z);
         }
 
-        float length()
+        float length() const
         {
             return std::sqrt((x*x) + (y*y) + (z*z));
+        }
+
+        vec3 normalize() const
+        {
+            return *this / length();
         }
 
         void normalize_inplace()
@@ -89,10 +98,7 @@ class vec3
             *this /= length();
         }
 
-        // Temporary solution.
-        // I want to create a constructor in vec4 using vec3 but circular dependencies.
-        // I could move the definitions into .cpp files but I believe inline definitions have better performance.
-        vec4 homogenize()
+        vec4 homogenize() const
         {
             return vec4(x, y, z, 1);
         }
@@ -101,6 +107,10 @@ class vec3
         {
             std::cout << "Vec3" << ": x = " << x << ", y = " << y << ", z = " << z << std::endl;
         }
+
+        float x = 0;
+        float y = 0;
+        float z = 0;
 };
 
 inline float dot(const vec3& a, const vec3& b)

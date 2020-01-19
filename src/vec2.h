@@ -1,16 +1,16 @@
 #pragma once
+#include "vec4.h"
 #include "vec3.h"
+#include <iostream>
 
 // Implementation inspired by Eric Lengyel's in Foundations of Game Engine Development Vol 1.
 class vec2
 {
     public: 
-        float x = 0, y = 0;
-
         vec2() = default;
 
-        vec2(float a, float b)
-            : x(a), y(b)
+        vec2(float X, float Y)
+            : x(X), y(Y)
         {
         }
 
@@ -41,6 +41,11 @@ class vec2
             return *this;
         }
 
+        vec2 operator*(float s) const
+        {
+            return vec2(x * s, y * s);
+        }
+
         vec2& operator/=(float s)
         {
             s = 1.0f / s;
@@ -49,8 +54,9 @@ class vec2
             return *this;
         }
 
-        vec2 operator*(float s) const
+        vec2 operator/(float s) const
         {
+            s = 1.0f / s;
             return vec2(x * s, y * s);
         }
 
@@ -82,9 +88,21 @@ class vec2
         {
             std::cout << "Vec2" << ": x = " << x << ", y = " << y << std::endl;
         }
+
+        float x = 0;
+        float y = 0;
 };
 
 inline float dot(const vec2& a, const vec2& b)
 {
     return ((a.x * b.x) + (a.y * b.y));
+}
+
+// We are given two vectors with z = 0, and want to calculate their cross product.
+// This is equivalent to the 2x2 determinant formed by the vectors created by their x and y components.
+// This is also equivalent to the area of the parallelogram formed by the two vectors.
+// This is also equivalent to comparing b to the edge function of a.
+inline float cross(const vec2& a, const vec2& b)
+{
+    return (a.x * b.y) - (a.y * b.x);
 }
