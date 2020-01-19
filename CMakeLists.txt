@@ -14,6 +14,7 @@ set(SOURCE_FILES
   src/texture.cpp
   src/utils.cpp
   src/mesh.cpp
+  src/world.cpp
 )
 
 # Add the executable, which should be built from the given source (.cpp) files.

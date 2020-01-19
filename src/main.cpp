@@ -15,6 +15,7 @@
 #include "texture.h"
 #include "utils.h"
 #include "mesh.h"
+#include "world.h"
 
 #define trace(var)  { std::cout << "Line " << __LINE__ << ": " << #var << "=" << var << "\n";}
 
@@ -25,68 +26,6 @@ const inline int WINDOW_HEIGHT = 800;
 const inline SDL_PixelFormat* pixel_format;
 
 bool quit = false;
-
-void draw_line(int x0, int y0, int x1, int y1, Frame& frame)
-{
-    int x = x0;
-    int y = y0;
-    int dx = std::abs(x1 - x0);
-    int dy = std::abs(y1 - y0);
-    bool steep = false;
-
-    if (dy > dx)
-    {
-        std::swap(x0, y0);
-        std::swap(x1, y1);
-        std::swap(x, y);
-        std::swap(dx, dy);
-        steep = true;
-    }
-
-    int P = 2*dy - dx;
-
-    bool decrement_x = (x0 > x1);
-    bool decrement_y = (y0 > y1);
-
-    while ((decrement_x) ? x >= x1 : x <= x1)
-    {
-        if (steep)
-        {
-            frame.set_pixel(y, x, 0xffff0000);
-        } else
-        {
-            frame.set_pixel(x, y, 0xffff0000); }
-        if (P < 0)
-        {
-            P = P + 2*dy;
-        } else
-        {
-            P = P + 2*dy - 2*dx;
-            if (decrement_y)
-            {
-                --y;
-            } else
-            {
-                ++y;
-            }
-        }
-        
-        if (decrement_x)
-        {
-            --x;
-        } else
-        {
-            ++x;
-        }
-    }
-}
-
-void draw_line(vec3& v0, vec3& v1, vec3& v2, Frame& frame)
-{
-    draw_line(v0.x, v0.y, v1.x, v1.y, frame);
-    draw_line(v1.x, v1.y, v2.x, v2.y, frame);
-    draw_line(v2.x, v2.y, v0.x, v0.y, frame);
-}
 
 // We are given two vectors with z = 0, and want to calculate their cross product.
 // This is equivalent to the 2x2 determinant formed by the vectors created by their x and y components.
@@ -307,131 +246,6 @@ void draw_triangle(vec4 p0, vec4 p1, vec4 p2, Frame& frame, float* z_buffer, std
     }
 }
 
-void draw_triangle_simple(const std::vector<vec3>& vertices, const std::vector<vec3>& colors, Frame& frame, float* z_buffer, std::vector<vec2> uvs, Texture& texture)
-{
-    vec3 p0 = vertices[0];
-    vec3 p1 = vertices[1];
-    vec3 p2 = vertices[2];
-
-    vec2 edge0 = (p1 - p0);
-    vec2 edge1 = (p2 - p1);
-    vec2 edge2 = (p0 - p2);
-
-    // Get the bounding box of these points.
-    int min_x = min3(p0.x, p1.x, p2.x);
-    int max_x = max3(p0.x, p1.x, p2.x);
-    int min_y = min3(p0.y, p1.y, p2.y);
-    int max_y = max3(p0.y, p1.y, p2.y);
-
-    // Clip against the screen.
-    min_x = std::max(min_x, 0);
-    max_x = std::min(max_x, frame.w - 1);
-    min_y = std::max(min_y, 0);
-    max_y = std::min(max_y, frame.h - 1);
-
-    // Iterate through all pixels inside the bounding box.
-    for (int i = min_x; i <= max_x; i++)
-    {
-        for (int j = min_y; j <= max_y; j++)
-        {
-            vec2 to_point_from_p0 = vec2(i, j) - vec2(p0);
-            vec2 to_point_from_p1 = vec2(i, j) - vec2(p1);
-            vec2 to_point_from_p2 = vec2(i, j) - vec2(p2);
-
-            float v0v1p = cross_2d(edge0, to_point_from_p0); 
-            float v1v2p = cross_2d(edge1, to_point_from_p1); 
-            float v2v0p = cross_2d(edge2, to_point_from_p2); 
-
-            if (v0v1p >= 0 && v1v2p >= 0 && v2v0p >= 0)
-            {
-                float v0v1v2 = cross_2d(p1 - p0, p2 - p0);
-
-                if (v0v1v2 == 0) return;
-
-                float w0 = v1v2p / v0v1v2; // corresponds to the weight of p0
-                float w1 = v2v0p / v0v1v2; // corresponds to the weight of p1
-                float w2 = v0v1p / v0v1v2; // corresponds to the weight of p2
-
-                // Get z value by interpolating from each vertice using the barycentric coordinates.
-                // Should no longer work with perspective.
-                float z = 0;
-                z += (w0 * p0.z);
-                z += (w1 * p1.z);
-                z += (w2 * p2.z);
-
-#ifdef PERSPECTIVE
-                float inverted_z = 0;
-                inverted_z += (w0 * 1/p0.z);
-                inverted_z += (w1 * 1/p1.z);
-                inverted_z += (w2 * 1/p2.z);
-
-                z = 1/inverted_z;
-#endif
-                vec3 color;
-                vec2 uv;
-
-                vec3 color0 = colors[0];
-                vec3 color1 = colors[1];
-                vec3 color2 = colors[2];
-                
-                vec2 uv0 = uvs[0];
-                vec2 uv1 = uvs[1];
-                vec2 uv2 = uvs[2];
-
-#ifdef PERSPECTIVE
-                color0 /= p0.z;
-                color1 /= p1.z;
-                color2 /= p2.z;
-
-                uv0 /= p0.z;
-                uv1 /= p1.z;
-                uv2 /= p2.z;
-#endif
-                // Interpolate vertex colors.
-                color += (color0 * w0);
-                color += (color1 * w1);
-                color += (color2 * w2);
-
-                uv += (uv0 * w0);
-                uv += (uv1 * w1);
-                uv += (uv2 * w2);
-#ifdef PERSPECTIVE
-                // Multiply the result by the z of the pixel
-                color *= z;
-                uv *= z;
-#endif
-
-                // The u,v coordinates HAVE to be floored before indexing the texture color with them!
-                uint32_t u = (uint32_t) std::floor(uv.x * texture.width);
-                uint32_t v = (uint32_t) std::floor(uv.y * texture.width);
- 
-                // Sample the color at uv.x and uv.y.
-                // Nice way of sampling borrowed from NotCamelCase/SoftLit.
-                // TODO: Abstract getting texture color (won't always be in RGB fashion)
-                int idx = ((v * texture.width) + u) * texture.channels;
-                float r = (float) texture.data[idx++];
-                float g = (float) texture.data[idx++];
-                float b = (float) texture.data[idx++];
-
-                uint32_t interpolated_colors = SDL_MapRGBA(pixel_format, color.x, color.y, color.z, 255);
-                uint32_t texture_color = SDL_MapRGBA(pixel_format, r, g, b, 255);
-
-                // If the z-value of the pixel we're on is greater than our current stored z-buffer's value...
-                #ifdef PERSPECTIVE
-                if (z < z_buffer[i + (j * frame.w)])
-                #else
-                if (z > z_buffer[i + (j * frame.w)])
-                #endif
-                {
-                    // Replace it and color that pixel in.
-                    z_buffer[i + (j * frame.w)] = z;
-                    frame.set_pixel(i, j, texture_color);
-                }
-            }
-        }
-    }
-}
-
 // Constructs a view matrix given the position of the eye and the target.
 // Use the unit vector pointing up as our temporary up vector, if none is specified.
 mat4 lookAt(vec3 eye, vec3 target, vec3 up = vec3(0, 1, 0))
@@ -522,6 +336,7 @@ int main() {
       exit(1);
     }
 
+    // DEPRECATED
     // Create a light.
     // TODO: The light distance should affect the intensity of the shading...
     vec3 light_dir(0.5, -1, 1);
@@ -536,6 +351,12 @@ int main() {
     float l = -r;
     float n = 1.8f;
     float f = 10.0f;
+
+    World world;
+    // Should not be normalized, technically, if we wanna do attenuation
+    world.set_mesh(mesh);
+    world.set_light(vec3(0.5, -1, -1).normalize());
+    world.set_eye(vec3(1, 1, 3));
 
     // Here's how the pipeline goes:
     // Local -> world -> eye -> clip -> screen -> viewport
@@ -589,96 +410,13 @@ int main() {
     float* z_buffer = new float[frame.w * frame.h];
     for (int i = 0; i < frame.w * frame.h; i++)
     {
-        #ifdef PERSPECTIVE
             z_buffer[i] = std::numeric_limits<float>::max();
-        #else 
-            z_buffer[i] = std::numeric_limits<float>::lowest();
-        #endif
     }
 
     std::vector<vec3> colors;
     colors.push_back(vec3(255, 0, 0));
     colors.push_back(vec3(0, 255, 0));
     colors.push_back(vec3(0, 0, 255));
-
-    std::vector<vec2> uvs;
-    uvs.push_back(vec2(0, 0));
-    uvs.push_back(vec2(1, 0));
-    uvs.push_back(vec2(0, 1));
-
-#ifndef MODEL
-#ifdef PERSPECTIVE
-    std::vector<vec3> vertices;
-    vertices.push_back((vec3(0.1*2, 0.2*2, 0.8)));
-    vertices.push_back((vec3(0.5*2, 0.2*2, 1)));
-    vertices.push_back((vec3(0.3*2, 0.4*2, 0.5)));
-
-
-    std::vector<vec3> transformed;
-
-    for (const vec3& vertex : vertices)
-    {
-        float vx = vertex.x;
-        float vy = vertex.y;
-        float vz = vertex.z;
-        vec4 clip = mvp * vec4(vx, vy, vz, 1);
-        vec4 screen = clip / clip.w; // Perspective divide.
-        vec3 viewport_coord = (viewport * screen);
-        viewport_coord.x = (int) viewport_coord.x;
-        viewport_coord.y = (int) viewport_coord.y;
-        transformed.push_back(viewport_coord);
-    } 
-
-    draw_triangle_simple(transformed, colors, frame, z_buffer, uvs, texture);
-
-#ifdef ZBUFFER
-    float old_low = std::numeric_limits<float>::max();
-    float old_high = std::numeric_limits<float>::lowest();
-
-    for (int i = 0; i < frame.w; i++)
-    {
-        for (int j = 0; j < frame.h; j++)
-        {
-            old_low = std::min(old_low, z_buffer[i+(j*frame.w)]);
-            if (z_buffer[i+(j*frame.w)] != std::numeric_limits<float>::max())
-            {
-                old_high = std::max(old_high, z_buffer[i+(j*frame.w)]);
-            }
-        }
-    }
-
-    std::cout << old_low << std::endl;
-    std::cout << old_high << std::endl;
-
-    // Draw zbuffer
-    for (int i = 0; i < frame.w; i++)
-    {
-        for (int j = 0; j < frame.h; j++)
-        {
-            float old_z = z_buffer[i+(j*frame.w)];
-            float z = 0.0f;
-            if (old_z != std::numeric_limits<float>::max())
-            {
-                z = convert_num_to_new_range(old_low, old_high, 0.0f, 255.0f, old_z);
-            }
-            if (z != 0.0f)
-            {
-                std::cout << "z: " << z << std::endl;
-            }
-            frame.set_pixel(i, j, SDL_MapRGBA(pixel_format, z, 0, 0, 255));
-        }
-    }
-#endif
-#else
-    std::vector<vec3> vertices;
-    vertices.push_back(vec3(381, 439, 78.6035));
-    vertices.push_back(vec3(628, 400, 29.5712));
-    vertices.push_back(vec3(521, 565, 81.4573));
-    draw_triangle_simple(vertices, colors, frame, z_buffer, uvs, texture);
-#endif 
-#endif
-
-    #ifdef MODEL
 
     // For each shape...
     for (size_t s = 0; s < shapes.size(); s++)
@@ -833,7 +571,6 @@ int main() {
             f_index_begin += num_vertices;
         }
     }
-    #endif
 
     frame.flip_image_on_x_axis();
     
