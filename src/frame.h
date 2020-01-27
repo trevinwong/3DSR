@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include <utility>
+#include "SDL.h"
 
 class Frame
 {
@@ -8,9 +9,10 @@ class Frame
         int w = 0;
         int h = 0;
         uint32_t* buffer = nullptr;
+        const SDL_PixelFormat* pixel_format;
 
         Frame() = default;
-        Frame(int width, int height);
+        Frame(int width, int height, const SDL_PixelFormat* pf);
         Frame(const Frame& other);
         Frame& operator=(const Frame& other);
         Frame(Frame&& other) noexcept;

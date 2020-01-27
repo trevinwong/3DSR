@@ -151,7 +151,7 @@ inline mat4 identity()
                 0, 0, 0, 1);
 }
 
-inline vec4 operator*(const mat4& M, const vec4 v)
+inline vec4 operator*(const mat4& M, const vec4& v)
 {
     return (vec4((M(0,0) * v.x) + (M(0,1) * v.y) + (M(0,2) * v.z) + (M(0,3) * v.w),
                  (M(1,0) * v.x) + (M(1,1) * v.y) + (M(1,2) * v.z) + (M(1,3) * v.w),

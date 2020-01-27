@@ -1,8 +1,8 @@
 #include "frame.h"
 #include <iostream>
 
-Frame::Frame(int width, int height)
-    : w(width), h(height)
+Frame::Frame(int width, int height, const SDL_PixelFormat* pf)
+    : w(width), h(height), pixel_format(pf)
 {
     buffer = new uint32_t[(w * h) * sizeof(uint32_t)];
 }

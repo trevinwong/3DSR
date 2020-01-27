@@ -1,23 +1,29 @@
 #pragma once
 #include "mesh.h"
+#include "mat4.h"
 
 class World
 {
     public:
         World() = default;
-        void set_mesh(const Mesh& m);
-        const Mesh& get_mesh();
+        void add_mesh_to_world(Mesh& mesh, const mat4& transformation);
+        std::vector<std::pair<Mesh, mat4>>& get_meshes_in_world();
 
         void set_light(const vec3& l);
-        const vec3& get_light();
+        const vec3& get_light() const;
 
         void set_eye(const vec3& e);
-        const vec3& get_eye();
+        const vec3& get_eye() const;
+
+        void set_look_at_pt(const vec3& lk_at);
+        const vec3& get_look_at_pt() const;
     private:
-        // Could be expanded into a list of meshes, but we only render 1 mesh at a time in this world
-        Mesh mesh;
+        // A mesh and its transformation in the world.
+        std::vector<std::pair<Mesh, mat4>> meshes_in_world;
+
         vec3 light;
         vec3 eye;
+        vec3 look_at_pt;
         float t = 1.0f;
         float b = -t;
         float r = 1.0f;
