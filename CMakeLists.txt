@@ -17,6 +17,15 @@ set(SOURCE_FILES
   src/rasterizer.cpp
 )
 
+# Find the OS.
+if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+  set(IS_OS_LINUX 1)
+elseif(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+  set(IS_OS_WINDOWS 1)
+else()
+  message(FATAL_ERROR "OS ${CMAKE_SYSTEM_NAME} was not recognized")
+endif()
+
 # Add the executable, which should be built from the given source (.cpp) files.
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 
@@ -24,12 +33,33 @@ add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_include_directories(${PROJECT_NAME} PUBLIC src/)
 target_include_directories(${PROJECT_NAME} PUBLIC lib/)
 
-# Find SDL2 and link it in.
-find_package(PkgConfig REQUIRED)
-pkg_search_module(SDL2 REQURIED sdl2)
+# Link in SDL2.
+if (IS_OS_LINUX)
+    # If we're on Linux, we can just use PkgConfig to find and link in SDL2
+    find_package(PkgConfig REQUIRED)
+    pkg_search_module(SDL2 REQURIED sdl2)
+elseif (IS_OS_WINDOWS)
+    set(SDL2_FOUND TRUE)
+    set(SDL2_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/ext/sdl/include/SDL")
+
+    # Check if x64 or x86
+    if (${CMAKE_SIZEOF_VOID_P} MATCHES "8")
+        set(SDL2_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/ext/sdl/lib/SDL2-x64.lib")
+		set(SDL_DLL "${CMAKE_CURRENT_SOURCE_DIR}/ext/sdl/lib/SDL2-x64.dll")
+    else()
+        set(SDL2_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/ext/sdl/lib/SDL2-x86.lib")
+		set(SDL_DLL "${CMAKE_CURRENT_SOURCE_DIR}/ext/sdl/lib/SDL2-x86.dll")
+    endif()
+
+    # Copy and rename .dll's
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${SDL_DLL}"
+        "$<TARGET_FILE_DIR:${PROJECT_NAME}>/SDL2.dll")
+endif()
 
 if (NOT SDL2_FOUND)
-  message(FATAL_ERROR "Can't find SDL." )
+  message(FATAL_ERROR "Can't find SDL2." )
 endif()
 
 # Copies over our /obj directory where the project is actually built so it can find the appropriate paths.
@@ -40,4 +70,6 @@ file(COPY obj/ DESTINATION "${PROJECT_BINARY_DIR}/obj")
 file(COPY img/ DESTINATION "${PROJECT_BINARY_DIR}/img")
 
 target_include_directories(${PROJECT_NAME} PUBLIC ${SDL2_INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME} PUBLIC ${SDL2_LIBRARIES})
+if(IS_OS_LINUX)
+    target_link_libraries(${PROJECT_NAME} PUBLIC ${SDL2_LIBRARIES})
+endif()
