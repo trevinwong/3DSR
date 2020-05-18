@@ -101,7 +101,7 @@ void Rasterizer::setup_vertices()
 
 }
 
-void Rasterizer::draw_triangle(const Vertex& v0, const Vertex& v1, const Vertex& v2, const Texture& texture) 
+void Rasterizer::draw_triangle(const Vertex& v0, const Vertex& v1, const Vertex& v2, Texture* texture) 
 {
     // Create a vec2 out of each vertice's viewport coordinates - which will make calculations a lot easier
     vec2 vp0(v0.viewport_coords);
@@ -227,20 +227,29 @@ void Rasterizer::draw_triangle(const Vertex& v0, const Vertex& v1, const Vertex&
                 
                 xy *= z;
 
-                // The u,v coordinates HAVE to be floored before indexing the texture color with them!
-                uint32_t u = (uint32_t) std::floor(uv.x * texture.width);
-                uint32_t v = (uint32_t) std::floor(uv.y * texture.width);
- 
-                // Sample the color at uv.x and uv.y.
-                // Nice way of sampling borrowed from NotCamelCase/SoftLit.
-                // TODO: Abstract getting texture color (won't always be in RGB fashion)
-                int idx = ((v * texture.width) + u) * texture.channels;
-                float r = (float) texture.data[idx++];
-                float g = (float) texture.data[idx++];
-                float b = (float) texture.data[idx++];
+                // If there is no texture, just use white as the default color.
+                float r = 255.0f;
+                float g = 255.0f;
+                float b = 255.0f;
 
-                uint32_t texture_color = SDL_MapRGBA(frame.pixel_format, r, g, b, 255);
-                uint32_t texture_shaded_color = SDL_MapRGBA(frame.pixel_format, r * intensity, g * intensity, b * intensity, 255);
+                if (texture != nullptr)
+                {
+                    // The u,v coordinates HAVE to be floored before indexing the texture color with them!
+                    uint32_t u = (uint32_t) std::floor(uv.x * texture->width);
+                    uint32_t v = (uint32_t) std::floor(uv.y * texture->width);
+     
+                    // Sample the color at uv.x and uv.y.
+                    // Nice way of sampling borrowed from NotCamelCase/SoftLit.
+                    // TODO: Abstract getting texture color (won't always be in RGB fashion)
+                    int idx = ((v * texture->width) + u) * texture->channels;
+                    r = (float) texture->data[idx++];
+                    g = (float) texture->data[idx++];
+                    b = (float) texture->data[idx++];
+
+                    uint32_t texture_color = SDL_MapRGBA(frame.pixel_format, r, g, b, 255);
+                    uint32_t texture_shaded_color = SDL_MapRGBA(frame.pixel_format, r * intensity, g * intensity, b * intensity, 255);
+                }
+
                 uint32_t gouraud_color = SDL_MapRGBA(frame.pixel_format, intensity * 255, intensity * 255, intensity * 255, 255);
 
                 // Phong shading

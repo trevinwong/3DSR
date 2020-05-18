@@ -24,6 +24,12 @@ Mesh::Mesh(std::string_view path)
     parse_obj(attrib, shapes, materials);
 }
 
+Mesh::Mesh(std::string_view path, Texture* t)
+    : Mesh(path)
+{ 
+    texture = t;
+}
+
 void Mesh::parse_obj(const tinyobj::attrib_t& attrib, const std::vector<tinyobj::shape_t>& shapes, const std::vector<tinyobj::material_t>& materials)
 {
     for (size_t s = 0; s < shapes.size(); s++)
@@ -39,25 +45,18 @@ void Mesh::parse_obj(const tinyobj::attrib_t& attrib, const std::vector<tinyobj:
             {
                 Vertex vertex;
 
-                // Fetch the index of the 1st/2nd/3rd... etc. vertex
-                // This index is NOT the vertex index, but rather the index in mesh.indices.
                 tinyobj::index_t idx = shapes[s].mesh.indices[f_index_begin + v]; 
 
-                // We can obtain the vertex index by calling idx.vertex_index.
-                // All vertices are listed in a linear array, so our stride is 3 (x,y,z)
                 tinyobj::real_t vx = attrib.vertices[3*idx.vertex_index + 0];
                 tinyobj::real_t vy = attrib.vertices[3*idx.vertex_index + 1];
                 tinyobj::real_t vz = attrib.vertices[3*idx.vertex_index + 2];
                 vertex.local_coords = vec3(vx, vy, vz);
 
-                // We can obtain the vertex index by calling idx.normal_index.
-                // All normals are listed in a linear array, so our stride is 3 (x,y,z)
                 tinyobj::real_t nx = attrib.normals[3*idx.normal_index + 0];
                 tinyobj::real_t ny = attrib.normals[3*idx.normal_index + 1];
                 tinyobj::real_t nz = attrib.normals[3*idx.normal_index + 2];
                 vertex.normal =  vec3(nx, ny, nz);
 
-                // Textures.
                 tinyobj::real_t tx = attrib.texcoords[2*idx.texcoord_index+0];
                 tinyobj::real_t ty = attrib.texcoords[2*idx.texcoord_index+1];
                 vertex.texture_coords = vec2(tx, ty);
@@ -66,16 +65,13 @@ void Mesh::parse_obj(const tinyobj::attrib_t& attrib, const std::vector<tinyobj:
             }
 
             polygons.push_back(polygon);
-            // The index at which each face begins in mesh.indices.
-            // Remember that each face could have a variable number of vertices (3, 4, 5, etc.), so the index at which a face begins must be adjusted
-            // each time for each face that we process.
             f_index_begin += num_vertices;
         }
     }
 
 }
 
-void Mesh::set_texture(const Texture& t)
+void Mesh::set_texture(Texture* t)
 {
     texture = t;
 }

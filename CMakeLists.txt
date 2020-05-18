@@ -10,7 +10,9 @@ set (CMAKE_CXX_STANDARD 17)
 
 set(SOURCE_FILES
   src/main.cpp
+  src/mat4.cpp
   src/frame.cpp
+  src/object.cpp
   src/texture.cpp
   src/mesh.cpp
   src/world.cpp

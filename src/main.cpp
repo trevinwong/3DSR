@@ -8,6 +8,7 @@
 #include "vec4.h"
 #include "mat4.h"
 #include "frame.h"
+#include "object.h"
 #include "texture.h"
 #include "utils.h"
 #include "mesh.h"
@@ -24,10 +25,8 @@ const inline int WINDOW_HEIGHT = 800;
 bool quit = false;
 
 int main() {
-    // Initialize event var. to store events when unqueueing them.
     SDL_Event event;
 
-    // Initialize SDL (we only care about the video subsystem)
     if (SDL_Init(SDL_INIT_VIDEO) < 0)
             return 1;
 
@@ -36,29 +35,21 @@ int main() {
                     WINDOW_WIDTH, WINDOW_HEIGHT,
                     SDL_WINDOW_SHOWN);
 
-    // Attach an SDL_Renderer to the window.
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, 0);
 
-    // Creates the "screen" as a texture which we will update with the frame buffer we will draw to using the CPU.
-    // Each pixel will be a uint32. 
-    // The most significant 8 bytes will be the alpha, then red, then green, then blue, as specified by the pixel format below.
     SDL_Texture* screen = SDL_CreateTexture(renderer,
-                        SDL_PIXELFORMAT_ARGB8888,
-                        SDL_TEXTUREACCESS_STREAMING,
-                        WINDOW_WIDTH, WINDOW_HEIGHT);
+                          SDL_PIXELFORMAT_ARGB8888,
+                          SDL_TEXTUREACCESS_STREAMING,
+                          WINDOW_WIDTH, WINDOW_HEIGHT);
     
-    // Create a Frame object, which allocates a buffer to draw to.
     Frame frame(WINDOW_WIDTH, WINDOW_HEIGHT, SDL_AllocFormat(SDL_PIXELFORMAT_ARGB8888));
 
-    // Load our texture.
-    Texture texture("img/african_head_diffuse.tga");
-    
-    // Load our object.
-    Mesh mesh("obj/african_head.obj");
-    mesh.set_texture(texture);
+    Texture texture("img/african_head_diffuse.tga"); 
+    Mesh mesh("obj/african_head.obj", &texture);
 
-    // Construct our model matrix.
-    // (i.e should contain any of the transformations we make to the model in the world, which right now is none)
+    Object head(&mesh);
+
+    // TO-DO: Remove this matrix. The Object "head" should be added to the world instead of the matrix itself being added raw.
     mat4 model      (   1, 0, 0, 0,
                         0, 1, 0, 0,
                         0, 0, 1, 0,
@@ -76,10 +67,8 @@ int main() {
     double angle = 0;
     double TWO_PI = 2.0*M_PI;
     
-    // Main loop.
     while (!quit)
     {
-        // Event loop.
         while (SDL_PollEvent(&event) != 0)
         {
             quit = (event.type == SDL_QUIT);
@@ -94,7 +83,6 @@ int main() {
         // The last argument is the number of bytes between one row and the next.
         SDL_UpdateTexture(screen, NULL, frame.buffer, WINDOW_WIDTH * sizeof(uint32_t));
 
-        // Render.
         SDL_RenderClear(renderer);
         SDL_RenderCopy(renderer, screen, NULL, NULL);
         SDL_RenderPresent(renderer);
