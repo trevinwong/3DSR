@@ -57,6 +57,7 @@ void mat4::print()
     std::cout << n[0][3] << n[1][3] << n[2][3] << n[3][3] << std::endl;  
 }
 
+// https://stackoverflow.com/questions/1148309/inverting-a-4x4-matrix
 mat4 inverse(const mat4& M)
 {
     float A2323 = M(2,2) * M(3,3) - M(2,3) * M(3,2);

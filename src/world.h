@@ -1,4 +1,5 @@
 #pragma once
+#include "object.h"
 #include "mesh.h"
 #include "mat4.h"
 
@@ -6,9 +7,14 @@ class World
 {
     public:
         World() = default;
+
+        // DEPRECATED
         void add_mesh_to_world(Mesh& mesh, const mat4& transformation);
         std::vector<std::pair<Mesh, mat4>>& get_meshes_in_world();
 
+        void addObject(Object* object);
+        std::vector<Object*>& getObjects();
+        
         void set_light(const vec3& l);
         const vec3& get_light() const;
 
@@ -18,6 +24,9 @@ class World
         void set_look_at_pt(const vec3& lk_at);
         const vec3& get_look_at_pt() const;
     private:
+        std::vector<Object*> objects;
+
+        // DEPRECATED
         // A mesh and its transformation in the world.
         std::vector<std::pair<Mesh, mat4>> meshes_in_world;
 

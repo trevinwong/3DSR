@@ -98,11 +98,6 @@ class vec3
             *this /= length();
         }
 
-        vec4 homogenize() const
-        {
-            return vec4(x, y, z, 1);
-        }
-
         void print() const
         {
             std::cout << "Vec3" << ": x = " << x << ", y = " << y << ", z = " << z << std::endl;

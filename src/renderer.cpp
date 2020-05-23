@@ -1,107 +1,68 @@
-#include "rasterizer.h"
+#include "renderer.h"
 #include <limits>
 #include <cmath>
 #include <utility>
 #include "utils.h"
 #include "vertex.h"
 
-Rasterizer::Rasterizer(World& w, Frame& f) :
+// TODO: Rename to renderer.
+// Separate vertex pre-processing/vertex shader from rasterization/fragment shading.
+
+Renderer::Renderer(World& w, Frame& f) :
     world(w), frame(f)
 {
 }
 
-void Rasterizer::render()
+void Renderer::render()
 {
     frame.fill_frame_with_color(0xADD8E6);
     setup_zbuffer();
-    setup_vertices();
-}
-
-// "Vertex shader" step.
-// Uses the world to begin setting up the information it needs to render onto the frame, by processing coordinates
-void Rasterizer::setup_vertices()
-{
-    mat4 view = lookAt(world.get_eye(), world.get_look_at_pt());
-
+    
     // TODO: refactor these functions to be not hardcoded, pass in args
+    mat4 view = lookAt(world.get_eye(), world.get_look_at_pt());
     mat4 perspective = get_perspective_matrix();
     mat4 viewport = get_viewport_matrix();
 
     for (auto&[mesh, model] : world.get_meshes_in_world())
     {
-        mat4 mv = view * model;
+        mat4 model_view = view * inverse(model);
         mat4 mv_t_inv = inverse(transpose(view * model));
 
-        for (Polygon& polygon : mesh.polygons)
+        for (Face& face : mesh.getFaces())
         {
-            // Process vertex attributes.
-            for (Vertex& vertex : polygon.vertices)
+            std::vector<vec4> face_ndc;
+            std::vector<Vertex> vertices_to_rasterize;
+
+            for (Vertex& vertex : face.vertices)
             {
-                vec4 homogeneous_coords = vertex.local_coords.homogenize();
-                vec4 world_coords = model * homogeneous_coords;
-                vec4 clip_coords = perspective * view * world_coords;
+                vec4 clip_coords = perspective * model_view * vertex.position;
+                vec4 normalized_device_coords = clip_coords / clip_coords.w; 
+                face_ndc.push_back(normalized_device_coords);
 
-                // We want to keep -z around. It'll let us do perspective interpolation.
-                float w = clip_coords.w;
-                vec4 screen_coords = clip_coords / clip_coords.w;
-                vec4 viewport_coords = viewport * screen_coords;
+                vec4 viewport_coords = viewport * normalized_device_coords;
+                viewport_coords.x = (int) viewport_coords.x; // Convert to int to avoid black gaps between triangles.
+                viewport_coords.y = (int) viewport_coords.y; // Convert to int to avoid black gaps between triangles.
+                viewport_coords.w = clip_coords.w; // Keep -z for perspective-correct linear interpolation.
+                 
+                Vertex to_rasterize;
+                to_rasterize.position = viewport_coords;
+                to_rasterize.normal = inverse(transpose(model_view)) * vertex.normal; // Foundations of 3D Computer Graphics, 3.6
+                to_rasterize.uv = vertex.uv;
 
-                // We need to convert to int otherwise weird black gaps will appear between triangles.
-                viewport_coords.x = (int) viewport_coords.x;
-                viewport_coords.y = (int) viewport_coords.y;
-                viewport_coords.w = w;
-                
-                // Calculate intensity for Gouraud shading.
-                // Directional light, not point light.
-                // TODO: should not be called get_light, but rather get_light_dir, if thats what we intend, since its already normalized
-                
-                // For point light.
-                /* vec3 to_light = world.get_light() - world_coords; */
-
-                float intensity = std::max(dot(vertex.normal, world.get_light()), 0.1f);
-
-                // Attenuation can be added too.
-                // This makes the model really dark though. Apparently quadratic attenuation is rarely used so the formula is:
-                // 1.0 / (1 + attenuation coefficient*distance to light)
-                // http://math.hws.edu/graphicsbook/c7/s2.html 7.27
-                
-                // TODO: Refactor this weird homogenizing thing
-                vec4 perspective_correct_normal = vertex.normal.homogenize();
-                // A vector is apparently supposed to have 0 in w.
-                perspective_correct_normal.w = 0; 
-
-                // When transforming vertices, we also need to transform normals, by the transpose inverse of the matrix we use.
-                // We only use the view * model matrix to do this however.
-                // https://graphics.stanford.edu/courses/cs248-05/persp/persp2.html
-                
-                // Save everything back to the vertex.
-                vertex.world_coords = world_coords;
-                vertex.clip_coords = clip_coords;
+                // DEPRECATED: use to_rasterize
                 vertex.viewport_coords = viewport_coords;
-                vertex.intensity = intensity;
-                vertex.perspective_correct_normal = mv_t_inv * perspective_correct_normal;
+                vertex.perspective_correct_normal = to_rasterize.normal;
             }
 
-            // Calculate the normal of the face.
-            // TODO: This could probably be done earlier to save unnecessary computation of vertex attributes.
-            vec3 face_normal = cross(polygon.vertices[1].world_coords - polygon.vertices[0].world_coords, polygon.vertices[2].world_coords - polygon.vertices[0].world_coords).normalize();
-
-            vec3 viewing = polygon.vertices[0].world_coords - world.get_eye();
-
-            float facing = dot(face_normal, viewing);
-            // If facing is positive, that means the polygon is facing the same direction as the viewing vector, aka, AWAY, so don't draw it!
-            if (facing < 0)
-            {
-                // TODO: Refactor this?
-                // This is no longer setting up vertices. we're getting into the fragment shader now.
-                draw_triangle(polygon.vertices[0], polygon.vertices[1], polygon.vertices[2], mesh.texture);
-            } 
+            // Foundations of 3D Computer Graphics, 12.2
+            float backface = ((face_ndc[2].x - face_ndc[1].x) * (face_ndc[0].y - face_ndc[1].y)) -
+                             ((face_ndc[2].y - face_ndc[1].y) * (face_ndc[0].x - face_ndc[1].x));
+            if (backface > 0) { draw_triangle(face.vertices[0], face.vertices[1], face.vertices[2], mesh.getTexture()); }
         }
     }
-
 }
 
-void Rasterizer::draw_triangle(const Vertex& v0, const Vertex& v1, const Vertex& v2, Texture* texture) 
+void Renderer::draw_triangle(const Vertex& v0, const Vertex& v1, const Vertex& v2, const std::shared_ptr<Texture>& texture) 
 {
     // Create a vec2 out of each vertice's viewport coordinates - which will make calculations a lot easier
     vec2 vp0(v0.viewport_coords);
@@ -292,7 +253,7 @@ void Rasterizer::draw_triangle(const Vertex& v0, const Vertex& v1, const Vertex&
 
 // Constructs a view matrix given the position of the eye and the target.
 // Use the unit vector pointing up as our temporary up vector, if none is specified.
-mat4 Rasterizer::lookAt(vec3 eye, vec3 target, vec3 up)
+mat4 Renderer::lookAt(vec3 eye, vec3 target, vec3 up)
 {
     // Translate eye position back to origin.
     // Our calculations assume that our eye is positioned at the origin and looks down the -Z axis.
@@ -333,7 +294,7 @@ mat4 Rasterizer::lookAt(vec3 eye, vec3 target, vec3 up)
 // Our camera typically looks down the negative z-axis but after transforming the coordinates it looks down the positive z-axis.
 // This means your z-buffer implementation needs to change: closer coordinates should be SMALLER, not LARGER
 // Construct the perspective matrix.
-mat4 Rasterizer::get_perspective_matrix()
+mat4 Renderer::get_perspective_matrix()
 {
     float t = 1.0f;
     float b = -t;
@@ -350,23 +311,19 @@ mat4 Rasterizer::get_perspective_matrix()
     return perspective;
 }
 
-    // Construct the viewport matrix, which comprises of multiple steps.
-    // Remember, our NDCS coords range from -1 to 1. We want them to range from 0 to 1.
-    // So we do this: (coords + 1), so it ranges from 0 to 2, and then divide by 2, which gets us to our desired range.
-    // Finally, we multiply by our width and height of our viewport!
-    // It all looks like this, using x as an example: width * (x + 1)/2 -> width*x/2 + width/2, which is exactly what's happening here
-mat4 Rasterizer::get_viewport_matrix()
+// Transforms the canonical cube (which ranges from [-1,-1,-1] to [1,1,1]) to range from [0,0,0] to [W,H,1].
+mat4 Renderer::get_viewport_matrix()
 {
-    int d = 255;
-    mat4 viewport   (   frame.w/2, 0, 0, (frame.w)/2,
-                        0, frame.h/2, 0, (frame.h)/2,
-                        0, 0, d/2, d/2,
-                        0, 0, 0, 1
+    mat4 viewport   (   
+                        frame.w/2, 0,         0,   (frame.w)/2,
+                        0,         frame.h/2, 0,   (frame.h)/2,
+                        0,         0,         1/2, 1/2,
+                        0,         0,         0,   1
                     );
     return viewport;
 }
 
-void Rasterizer::setup_zbuffer()
+void Renderer::setup_zbuffer()
 {
     z_buffer = new float[frame.w * frame.h];
     for (int i = 0; i < frame.w * frame.h; i++)
@@ -375,7 +332,7 @@ void Rasterizer::setup_zbuffer()
     }
 }
 
-void Rasterizer::draw_line(int x0, int y0, int x1, int y1, Frame& frame)
+void Renderer::draw_line(int x0, int y0, int x1, int y1, Frame& frame)
 {
     int x = x0;
     int y = y0;
@@ -431,7 +388,7 @@ void Rasterizer::draw_line(int x0, int y0, int x1, int y1, Frame& frame)
 }
 
 
-void Rasterizer::draw_line(vec3& v0, vec3& v1, vec3& v2, Frame& frame)
+void Renderer::draw_line(vec3& v0, vec3& v1, vec3& v2, Frame& frame)
 {
     draw_line(v0.x, v0.y, v1.x, v1.y, frame);
     draw_line(v1.x, v1.y, v2.x, v2.y, frame);

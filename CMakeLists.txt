@@ -16,7 +16,7 @@ set(SOURCE_FILES
   src/texture.cpp
   src/mesh.cpp
   src/world.cpp
-  src/rasterizer.cpp
+  src/renderer.cpp
 )
 
 # Find the OS.
