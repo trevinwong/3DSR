@@ -30,14 +30,12 @@ void Renderer::render()
 
         for (Face& face : mesh.getFaces())
         {
-            std::vector<vec4> face_ndc;
-            std::vector<Vertex> vertices_to_rasterize;
+            std::vector<Vertex> vrt_to_rasterize;
 
             for (Vertex& vertex : face.vertices)
             {
                 vec4 clip_coords = perspective * model_view * vertex.position;
                 vec4 normalized_device_coords = clip_coords / clip_coords.w; 
-                face_ndc.push_back(normalized_device_coords);
 
                 vec4 viewport_coords = viewport * normalized_device_coords;
                 viewport_coords.x = (int) viewport_coords.x; // Convert to int to avoid black gaps between triangles.
@@ -49,14 +47,17 @@ void Renderer::render()
                 to_rasterize.normal = inverse(transpose(model_view)) * vertex.normal; // Foundations of 3D Computer Graphics, 3.6
                 to_rasterize.uv = vertex.uv;
 
-                // DEPRECATED: use to_rasterize
+                vrt_to_rasterize.push_back(to_rasterize);
+
+                // DEPRECATED
                 vertex.viewport_coords = viewport_coords;
                 vertex.perspective_correct_normal = to_rasterize.normal;
             }
 
             // Foundations of 3D Computer Graphics, 12.2
-            float backface = ((face_ndc[2].x - face_ndc[1].x) * (face_ndc[0].y - face_ndc[1].y)) -
-                             ((face_ndc[2].y - face_ndc[1].y) * (face_ndc[0].x - face_ndc[1].x));
+            // Calculate the direction of the normal of the screen-space triangle, which is either towards -z or z
+            float backface = ((vrt_to_rasterize[2].position.x - vrt_to_rasterize[1].position.x) * (vrt_to_rasterize[0].position.y - vrt_to_rasterize[1].position.y)) -
+                             ((vrt_to_rasterize[2].position.y - vrt_to_rasterize[1].position.y) * (vrt_to_rasterize[0].position.x - vrt_to_rasterize[1].position.x));
             if (backface > 0) { draw_triangle(face.vertices[0], face.vertices[1], face.vertices[2], mesh.getTexture()); }
         }
     }
@@ -303,10 +304,11 @@ mat4 Renderer::get_perspective_matrix()
     float n = 1.8f;
     float f = 10.0f;
 
-    mat4 perspective(   2*n/(r-l), 0, (r+l)/(r-l), 0,
-                        0, 2*n/(t-b), (t+b)/(t-b), 0,
-                        0, 0, -(f + n)/(f - n), -2*(f * n)/(f - n),
-                        0, 0, -1, 0
+    mat4 perspective(   
+                        2*n/(r-l), 0,         (r+l)/(r-l),      0,
+                        0,         2*n/(t-b), (t+b)/(t-b),      0,
+                        0,         0,         -(f + n)/(f - n), -2*(f * n)/(f - n),
+                        0,         0,         -1,               0
                     );
     return perspective;
 }
@@ -314,12 +316,12 @@ mat4 Renderer::get_perspective_matrix()
 // Transforms the canonical cube (which ranges from [-1,-1,-1] to [1,1,1]) to range from [0,0,0] to [W,H,1].
 mat4 Renderer::get_viewport_matrix()
 {
-    mat4 viewport   (   
-                        frame.w/2, 0,         0,   (frame.w)/2,
-                        0,         frame.h/2, 0,   (frame.h)/2,
-                        0,         0,         1/2, 1/2,
-                        0,         0,         0,   1
-                    );
+    mat4 viewport(   
+                    frame.w/2, 0,         0,   (frame.w)/2,
+                    0,         frame.h/2, 0,   (frame.h)/2,
+                    0,         0,         1/2, 1/2,
+                    0,         0,         0,   1
+                );
     return viewport;
 }
 
