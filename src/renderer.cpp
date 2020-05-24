@@ -64,9 +64,9 @@ void Renderer::render()
 
 void Renderer::draw_triangle(const Vertex& v1, const Vertex& v2, const Vertex& v3, const std::shared_ptr<Texture>& texture) 
 {
-    vec2 v1_2d(v1.viewport_coords);
-    vec2 v2_2d(v2.viewport_coords);
-    vec2 v3_2d(v3.viewport_coords); 
+    vec2 v1_2d(v1.position);
+    vec2 v2_2d(v2.position);
+    vec2 v3_2d(v3.position); 
 
     vec2 edge0 = (v2_2d - v1_2d);
     vec2 edge1 = (v3_2d - v2_2d);
@@ -107,7 +107,7 @@ void Renderer::draw_triangle(const Vertex& v1, const Vertex& v2, const Vertex& v
                 float wn = (1.0f/wn_reciprocal);
 
                 // TODO: abstract shaders and varying variables
-                vec2 uv(((v1.texture_coords/v1.position.w) * wn * b1) + ((v2.texture_coords/v2.position.w) * wn * b2) + ((v3.texture_coords/v3.position.w) * wn * b3));
+                vec2 uv(((v1.uv/v1.position.w) * wn * b1) + ((v2.uv/v2.position.w) * wn * b2) + ((v3.uv/v3.position.w) * wn * b3));
                 vec3 normal(((v1.normal/v1.position.w) * wn * b1) + ((v2.normal/v2.position.w) * wn * b2) + ((v3.normal/v3.position.w) * wn * b3));
                 vec3 pos(((v1.clip_coords/v1.position.w) * wn * b1) + ((v2.clip_coords/v2.position.w) * wn * b2) + ((v3.clip_coords/v3.position.w) * wn * b3));
 
@@ -124,25 +124,46 @@ void Renderer::draw_triangle(const Vertex& v1, const Vertex& v2, const Vertex& v
                     b = (float) texture->data[idx++];
                 }
 
+                // vec3 fragment = vec3(pos.x, pos.y, wn).normalize();
+
                 float kd = 0.5f;
                 float ks = 0.6f;
 
-                vec3 to_eye = vec3(world.get_eye() - pos).normalize();
-                vec3 to_light = vec3(world.get_light() - pos).normalize();
-                vec3 reflected = vec3((normal - to_light)  * (dot(normal, to_light)) * 2).normalize(); // Slide 7 of https://www.cs.utexas.edu/~bajaj/graphics2012/cs354/lectures/lect14.pdf
+                // vec3 to_eye = vec3(world.get_eye() - fragment).normalize();
+                // vec3 to_light = vec3(world.get_light() - fragment).normalize();
+                // vec3 reflected = vec3((normal - to_light)  * (dot(normal, to_light)) * 2).normalize(); // Slide 7 of https://www.cs.utexas.edu/~bajaj/graphics2012/cs354/lectures/lect14.pdf
+
+                // float ambient = 0.3f;
+                // float diffuse = std::max(dot(normal, world.get_light()), 0.0f);
+                // float specular = std::pow(std::max(dot(to_eye, reflected), 0.0f), 2.0f);
+                // float phong_intensity = ambient + (kd * diffuse) + (ks * specular);
+                // uint32_t phong_color = SDL_MapRGBA(frame.pixel_format, r * phong_intensity, g * phong_intensity, b * phong_intensity, 255);
+                // phong_color = SDL_MapRGBA(frame.pixel_format, 255, 255, 255, 255);
+
+                vec3 fragment = vec3(pos.x, pos.y, wn).normalize();
+
+                vec3 to_eye = (world.get_eye() - fragment).normalize();
+                vec3 to_light = (world.get_light() - fragment).normalize();
+                // https://www.cs.utexas.edu/~bajaj/graphics2012/cs354/lectures/lect14.pdf
+                // slide 7
+                vec3 reflected = (normal - to_light) * (dot(normal, to_light)) * 2;
+                reflected.normalize_inplace();
 
                 float ambient = 0.3f;
                 float diffuse = std::max(dot(normal, world.get_light()), 0.0f);
                 float specular = std::pow(std::max(dot(to_eye, reflected), 0.0f), 2.0f);
-                float phong_intensity = ambient + (kd * diffuse) + (ks * specular);
-                uint32_t phong_color = SDL_MapRGBA(frame.pixel_format, r * phong_intensity, g * phong_intensity, b * phong_intensity, 255);
-                phong_color = SDL_MapRGBA(frame.pixel_format, 255, 255, 255, 255);
+                specular = std::max(std::pow(dot(to_eye, reflected), 8.0f), 0.0f);
+
+                float phong_term = ambient + (kd * diffuse) + (ks * specular);
+
+                uint32_t phong_combined = SDL_MapRGBA(frame.pixel_format, r * phong_term, g * phong_term, b * phong_term, 255);
+                uint32_t just_phong = SDL_MapRGBA(frame.pixel_format, std::min(phong_term * 255, 255.0f), std::min(phong_term * 255, 255.0f), std::min(phong_term * 255, 255.0f), 255);
 
                 // TODO: check if this is correct. we should be using > instead of <
                 if (wn < z_buffer[i + (j * frame.w)])
                 {
                     z_buffer[i + (j * frame.w)] = wn;
-                    frame.set_pixel(i, j, phong_color);
+                    frame.set_pixel(i, j, phong_combined);
                 }
             }
         }
