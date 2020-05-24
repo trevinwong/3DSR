@@ -5,6 +5,7 @@
 #include "texture.h"
 #include <vector>
 
+// TODO: come up with some vertex/shader abstraction for varying variables
 class Vertex
 {
     public:

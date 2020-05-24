@@ -40,212 +40,109 @@ void Renderer::render()
                 vec4 viewport_coords = viewport * normalized_device_coords;
                 viewport_coords.x = (int) viewport_coords.x; // Convert to int to avoid black gaps between triangles.
                 viewport_coords.y = (int) viewport_coords.y; // Convert to int to avoid black gaps between triangles.
-                viewport_coords.w = clip_coords.w; // Keep -z for perspective-correct linear interpolation.
+                viewport_coords.w = clip_coords.w; // Keep wn (aka -z) for perspective-correct linear interpolation.
                  
                 Vertex to_rasterize;
+                to_rasterize.clip_coords = clip_coords;
                 to_rasterize.position = viewport_coords;
                 to_rasterize.normal = inverse(transpose(model_view)) * vertex.normal; // Foundations of 3D Computer Graphics, 3.6
                 to_rasterize.uv = vertex.uv;
 
                 vrt_to_rasterize.push_back(to_rasterize);
-
-                // DEPRECATED
-                vertex.viewport_coords = viewport_coords;
-                vertex.perspective_correct_normal = to_rasterize.normal;
             }
 
             // Foundations of 3D Computer Graphics, 12.2
-            // Calculate the direction of the normal of the screen-space triangle, which is either towards -z or z
+            // Calculate the direction of the normal of the screen-space triangle, which is either towards -wn or +wn
+            // If +wn: vertices are CCW, aka facing the front-side
+            // If -wn: vertices are CW, aka facing the back-side
             float backface = ((vrt_to_rasterize[2].position.x - vrt_to_rasterize[1].position.x) * (vrt_to_rasterize[0].position.y - vrt_to_rasterize[1].position.y)) -
                              ((vrt_to_rasterize[2].position.y - vrt_to_rasterize[1].position.y) * (vrt_to_rasterize[0].position.x - vrt_to_rasterize[1].position.x));
-            if (backface > 0) { draw_triangle(face.vertices[0], face.vertices[1], face.vertices[2], mesh.getTexture()); }
+            if (backface > 0) { draw_triangle(vrt_to_rasterize[0], vrt_to_rasterize[1], vrt_to_rasterize[2], mesh.getTexture()); }
         }
     }
 }
 
-void Renderer::draw_triangle(const Vertex& v0, const Vertex& v1, const Vertex& v2, const std::shared_ptr<Texture>& texture) 
+void Renderer::draw_triangle(const Vertex& v1, const Vertex& v2, const Vertex& v3, const std::shared_ptr<Texture>& texture) 
 {
-    // Create a vec2 out of each vertice's viewport coordinates - which will make calculations a lot easier
-    vec2 vp0(v0.viewport_coords);
-    vec2 vp1(v1.viewport_coords);
-    vec2 vp2(v2.viewport_coords); 
+    vec2 v1_2d(v1.viewport_coords);
+    vec2 v2_2d(v2.viewport_coords);
+    vec2 v3_2d(v3.viewport_coords); 
 
-    vec2 edge0 = (vp1 - vp0);
-    vec2 edge1 = (vp2 - vp1);
-    vec2 edge2 = (vp0 - vp2);
+    vec2 edge0 = (v2_2d - v1_2d);
+    vec2 edge1 = (v3_2d - v2_2d);
+    vec2 edge2 = (v1_2d - v3_2d);
 
-    // Get the bounding box of these points.
-    int min_x = min3(vp0.x, vp1.x, vp2.x);
-    int max_x = max3(vp0.x, vp1.x, vp2.x);
-    int min_y = min3(vp0.y, vp1.y, vp2.y);
-    int max_y = max3(vp0.y, vp1.y, vp2.y);
+    int min_x = std::max(min3(v1_2d.x, v2_2d.x, v3_2d.x), 0);
+    int max_x = std::min(max3(v1_2d.x, v2_2d.x, v3_2d.x), frame.w - 1);
+    int min_y = std::max(min3(v1_2d.y, v2_2d.y, v3_2d.y), 0);
+    int max_y = std::min(max3(v1_2d.y, v2_2d.y, v3_2d.y), frame.h - 1);
 
-    // Clip against the screen.
-    min_x = std::max(min_x, 0);
-    max_x = std::min(max_x, frame.w - 1);
-    min_y = std::max(min_y, 0);
-    max_y = std::min(max_y, frame.h - 1);
-
-    // Iterate through all pixels inside the bounding box.
     for (int i = min_x; i <= max_x; i++)
     {
         for (int j = min_y; j <= max_y; j++)
         {
-            vec2 to_point_from_p0 = vec2(i, j) - vec2(vp0);
-            vec2 to_point_from_p1 = vec2(i, j) - vec2(vp1);
-            vec2 to_point_from_p2 = vec2(i, j) - vec2(vp2);
+            vec2 point(i,j);
+            vec2 to_point_from_p1 = point - vec2(v1_2d);
+            vec2 to_point_from_p2 = point - vec2(v2_2d);
+            vec2 to_point_from_p3 = point - vec2(v3_2d);
 
-            float v0v1p = cross(edge0, to_point_from_p0); 
-            float v1v2p = cross(edge1, to_point_from_p1); 
-            float v2v0p = cross(edge2, to_point_from_p2); 
+            float v0v1p = cross(edge0, to_point_from_p1); 
+            float v1v2p = cross(edge1, to_point_from_p2); 
+            float v2v0p = cross(edge2, to_point_from_p3); 
 
             if (v0v1p >= 0 && v1v2p >= 0 && v2v0p >= 0)
             {
-                float v0v1v2 = cross(vp1 - vp0, vp2 - vp0);
+                float v0v1v2 = cross(v2_2d - v1_2d, v3_2d - v1_2d);
+                if (v0v1v2 == 0) return; // Discard degenerate triangles, whose area is 0.
 
-                // Discard degenerate triangles.
-                if (v0v1v2 == 0) return;
+                // Barycentric coordinates, division by 2 is left out b/c only the ratio is needed
+                float b1 = v1v2p / v0v1v2;
+                float b2 = v2v0p / v0v1v2;
+                float b3 = v0v1p / v0v1v2;
 
-                // Calculate barycentric coordinates. 
-                // We can leave out the division by 2 since we're just getting the ratio between the sub-triangle and the triangle.
-                float w0 = v1v2p / v0v1v2;
-                float w1 = v2v0p / v0v1v2;
-                float w2 = v0v1p / v0v1v2;
-
-                // We can only linearly interpolate for inverted z using barycentric coordinates
+                // Rational linear interpolation.
                 // https://www.scratchapixel.com/lessons/3d-basic-rendering/rasterization-practical-implementation/visibility-problem-depth-buffer-depth-interpolation
-                float inverted_z = 0.0f;
-                inverted_z += (w0 * (1.0f/v0.viewport_coords.w));
-                inverted_z += (w1 * (1.0f/v1.viewport_coords.w));
-                inverted_z += (w2 * (1.0f/v2.viewport_coords.w));
+                // Foundations of 3D Computer Graphics, Ch 13
+                float wn_reciprocal = (b1 * (1.0f/v1.position.w)) + (b2 * (1.0f/v2.position.w)) + (b3 * (1.0f/v3.position.w));
+                float wn = (1.0f/wn_reciprocal);
 
-                float z = (1.0f/inverted_z);
+                // TODO: abstract shaders and varying variables
+                vec2 uv(((v1.texture_coords/v1.position.w) * wn * b1) + ((v2.texture_coords/v2.position.w) * wn * b2) + ((v3.texture_coords/v3.position.w) * wn * b3));
+                vec3 normal(((v1.normal/v1.position.w) * wn * b1) + ((v2.normal/v2.position.w) * wn * b2) + ((v3.normal/v3.position.w) * wn * b3));
+                vec3 pos(((v1.clip_coords/v1.position.w) * wn * b1) + ((v2.clip_coords/v2.position.w) * wn * b2) + ((v3.clip_coords/v3.position.w) * wn * b3));
 
-                vec2 uv;
-                vec2 uv0 = v0.texture_coords;
-                vec2 uv1 = v1.texture_coords;
-                vec2 uv2 = v2.texture_coords;
-
-                uv0 /= v0.viewport_coords.w;
-                uv1 /= v1.viewport_coords.w;
-                uv2 /= v2.viewport_coords.w;
-
-                uv += (uv0 * w0);
-                uv += (uv1 * w1);
-                uv += (uv2 * w2);
-
-                uv *= z;
-
-                // Interpolate the intensity of the color.
-                float intensity = 0.0f;
-
-                float intensity0 = v0.intensity;
-                float intensity1 = v1.intensity;
-                float intensity2 = v2.intensity;
-
-                intensity0 /= v0.viewport_coords.w;
-                intensity1 /= v1.viewport_coords.w;
-                intensity2 /= v2.viewport_coords.w;
-
-                intensity += (intensity0 * w0);
-                intensity += (intensity1 * w1);
-                intensity += (intensity2 * w2);
-                
-                intensity *= z;
-
-                // Interpolate normals.
-                vec3 normal;
-
-                vec3 normal0 = v0.normal;
-                vec3 normal1 = v1.normal;
-                vec3 normal2 = v2.normal;
-
-                normal0 /= v0.viewport_coords.w;
-                normal1 /= v1.viewport_coords.w;
-                normal2 /= v2.viewport_coords.w;
-
-                normal += (normal0 * w0);
-                normal += (normal1 * w1);
-                normal += (normal2 * w2);
-                
-                normal *= z;
-                normal.normalize_inplace();
-
-                // Interpolate vertex positions.
-                // We're repeating the perspective division process and using it for interpolation for a given pixel.
-                vec2 xy;
-
-                vec2 clip_xy0 = v0.clip_coords;
-                vec2 clip_xy1 = v1.clip_coords;
-                vec2 clip_xy2 = v2.clip_coords;
-
-                clip_xy0 /= v0.viewport_coords.w;
-                clip_xy1 /= v1.viewport_coords.w;
-                clip_xy2 /= v2.viewport_coords.w;
-
-                xy += (clip_xy0 * w0);
-                xy += (clip_xy1 * w1);
-                xy += (clip_xy2 * w2);
-                
-                xy *= z;
-
-                // If there is no texture, just use white as the default color.
-                float r = 255.0f;
-                float g = 255.0f;
-                float b = 255.0f;
-
+                float r = 255.0f, g = 255.0f, b = 255.0f;
                 if (texture != nullptr)
                 {
-                    // The u,v coordinates HAVE to be floored before indexing the texture color with them!
                     uint32_t u = (uint32_t) std::floor(uv.x * texture->width);
-                    uint32_t v = (uint32_t) std::floor(uv.y * texture->width);
+                    uint32_t v = (uint32_t) std::floor(uv.y * texture->height);
      
-                    // Sample the color at uv.x and uv.y.
-                    // Nice way of sampling borrowed from NotCamelCase/SoftLit.
-                    // TODO: Abstract getting texture color (won't always be in RGB fashion)
+                    // NotCamelCase/SoftLit/Texture.cpp
                     int idx = ((v * texture->width) + u) * texture->channels;
                     r = (float) texture->data[idx++];
                     g = (float) texture->data[idx++];
                     b = (float) texture->data[idx++];
-
-                    uint32_t texture_color = SDL_MapRGBA(frame.pixel_format, r, g, b, 255);
-                    uint32_t texture_shaded_color = SDL_MapRGBA(frame.pixel_format, r * intensity, g * intensity, b * intensity, 255);
                 }
 
-                uint32_t gouraud_color = SDL_MapRGBA(frame.pixel_format, intensity * 255, intensity * 255, intensity * 255, 255);
-
-                // Phong shading
                 float kd = 0.5f;
                 float ks = 0.6f;
 
-                vec3 fragment = vec3(xy.x, xy.y, z);
-                fragment.normalize_inplace();
-
-                vec3 to_eye = world.get_eye() - fragment;
-                to_eye.normalize_inplace();
-                vec3 to_light = world.get_light() - fragment;
-                to_light.normalize_inplace();
-                // https://www.cs.utexas.edu/~bajaj/graphics2012/cs354/lectures/lect14.pdf
-                // slide 7
-                vec3 reflected = (normal - to_light)  * (dot(normal, to_light)) * 2;
-                reflected.normalize_inplace();
+                vec3 to_eye = vec3(world.get_eye() - pos).normalize();
+                vec3 to_light = vec3(world.get_light() - pos).normalize();
+                vec3 reflected = vec3((normal - to_light)  * (dot(normal, to_light)) * 2).normalize(); // Slide 7 of https://www.cs.utexas.edu/~bajaj/graphics2012/cs354/lectures/lect14.pdf
 
                 float ambient = 0.3f;
                 float diffuse = std::max(dot(normal, world.get_light()), 0.0f);
                 float specular = std::pow(std::max(dot(to_eye, reflected), 0.0f), 2.0f);
-                specular = std::max(std::pow(dot(to_eye, reflected), 8.0f), 0.0f);
+                float phong_intensity = ambient + (kd * diffuse) + (ks * specular);
+                uint32_t phong_color = SDL_MapRGBA(frame.pixel_format, r * phong_intensity, g * phong_intensity, b * phong_intensity, 255);
+                phong_color = SDL_MapRGBA(frame.pixel_format, 255, 255, 255, 255);
 
-                float phong_term = ambient + (kd * diffuse) + (ks * specular);
-
-                uint32_t phong_combined = SDL_MapRGBA(frame.pixel_format, r * phong_term, g * phong_term, b * phong_term, 255);
-                uint32_t just_phong = SDL_MapRGBA(frame.pixel_format, std::min(phong_term * 255, 255.0f), std::min(phong_term * 255, 255.0f), std::min(phong_term * 255, 255.0f), 255);
-
-                // If the z-value of the pixel we're on is greater than our current stored z-buffer's value...
-                if (z < z_buffer[i + (j * frame.w)])
+                // TODO: check if this is correct. we should be using > instead of <
+                if (wn < z_buffer[i + (j * frame.w)])
                 {
-                    // Replace it and color that pixel in.
-                    z_buffer[i + (j * frame.w)] = z;
-                    frame.set_pixel(i, j, phong_combined);
+                    z_buffer[i + (j * frame.w)] = wn;
+                    frame.set_pixel(i, j, phong_color);
                 }
             }
         }
@@ -291,9 +188,9 @@ mat4 Renderer::lookAt(vec3 eye, vec3 target, vec3 up)
 
 // The math is from: http://www.songho.ca/opengl/gl_projectionmatrix.html#perspective
 // NOTE: this assumes n and f are both positive!!!
-// NOTE: this transforms the coordinates into NDCS coordinates, which FLIPS the direction of our z-axis, essentially
-// Our camera typically looks down the negative z-axis but after transforming the coordinates it looks down the positive z-axis.
-// This means your z-buffer implementation needs to change: closer coordinates should be SMALLER, not LARGER
+// NOTE: this transforms the coordinates into NDCS coordinates, which FLIPS the direction of our wn-axis, essentially
+// Our camera typically looks down the negative wn-axis but after transforming the coordinates it looks down the positive wn-axis.
+// This means your wn-buffer implementation needs to change: closer coordinates should be SMALLER, not LARGER
 // Construct the perspective matrix.
 mat4 Renderer::get_perspective_matrix()
 {
@@ -390,9 +287,9 @@ void Renderer::draw_line(int x0, int y0, int x1, int y1, Frame& frame)
 }
 
 
-void Renderer::draw_line(vec3& v0, vec3& v1, vec3& v2, Frame& frame)
+void Renderer::draw_line(vec3& v1, vec3& v2, vec3& v3, Frame& frame)
 {
-    draw_line(v0.x, v0.y, v1.x, v1.y, frame);
     draw_line(v1.x, v1.y, v2.x, v2.y, frame);
-    draw_line(v2.x, v2.y, v0.x, v0.y, frame);
+    draw_line(v2.x, v2.y, v3.x, v3.y, frame);
+    draw_line(v3.x, v3.y, v1.x, v1.y, frame);
 }
