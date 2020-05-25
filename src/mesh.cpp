@@ -26,8 +26,6 @@ void Mesh::parse_obj(const tinyobj::attrib_t& attrib, const std::vector<tinyobj:
                 tinyobj::real_t vx = attrib.vertices[3*idx.vertex_index + 0];
                 tinyobj::real_t vy = attrib.vertices[3*idx.vertex_index + 1];
                 tinyobj::real_t vz = attrib.vertices[3*idx.vertex_index + 2];
-                // DEPRECATED
-                vertex.local_coords = vec3(vx, vy, vz);
                 vertex.position = vec4(vx, vy, vz, 1);
 
                 tinyobj::real_t nx = attrib.normals[3*idx.normal_index + 0];
@@ -37,8 +35,6 @@ void Mesh::parse_obj(const tinyobj::attrib_t& attrib, const std::vector<tinyobj:
 
                 tinyobj::real_t u = attrib.texcoords[2*idx.texcoord_index+0];
                 tinyobj::real_t v = attrib.texcoords[2*idx.texcoord_index+1];
-                // DEPRECATED
-                vertex.texture_coords = vec2(u, v);
                 vertex.uv = vec2(u,v);
 
                 face.vertices.push_back(vertex);

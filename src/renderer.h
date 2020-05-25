@@ -30,5 +30,5 @@ class Renderer
         
         World& world;
         Frame& frame;
-        float* z_buffer = nullptr;
+        float* z_buffer = nullptr; // TODO: deallocate z_buffer
 };

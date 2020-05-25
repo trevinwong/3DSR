@@ -50,37 +50,61 @@ int main() {
 
     // Should be allocated as a smart ptr
     Object head(&mesh);
-
-    // TO-DO: Remove this matrix. The Object "head" should be added to the world instead of the matrix itself being added raw.
-    mat4 model      (   1, 0, 0, 0,
-                        0, 1, 0, 0,
-                        0, 0, 1, 0,
-                        0, 0, 0, 1
-                    );
+    mat4 model = makeTranslation(0, 0, 0);
 
     World world;
     world.addObject(&head);
 
     // DEPRECATED
     world.add_mesh_to_world(mesh, model);
-    // Should not be normalized, technically, if we wanna do attenuation
-    world.set_light(vec3(0.5, -1, -1).normalize());
-    world.set_eye(vec3(1, 1, 3));
+    world.set_light(vec3(0, 0, 3));
+    world.set_eye(vec3(0, 1, 3));
+    world.set_look_at_pt(vec3(0,0,0));
 
     Renderer framebuffer_renderer(world, frame);
 
-    double angle = 0;
+    double eye_angle = M_PI/2;
+    double light_angle = M_PI/2;
+    double ROT_SPEED = 0.1f;
+    double DISTANCE = 2;
     double TWO_PI = 2.0*M_PI;
     
     while (!quit)
     {
         while (SDL_PollEvent(&event) != 0)
         {
-            quit = (event.type == SDL_QUIT);
+            switch (event.type)
+            {
+            case SDL_KEYDOWN:
+                switch( event.key.keysym.sym )
+                {
+                case SDLK_LEFT:
+                    eye_angle = std::fmod(eye_angle + ROT_SPEED, TWO_PI);
+                    break;
+                case SDLK_RIGHT:
+                    eye_angle = std::fmod(eye_angle - ROT_SPEED, TWO_PI);
+                    break;
+                case SDLK_a:
+                    light_angle = std::fmod(light_angle + ROT_SPEED, TWO_PI);
+                    break;
+                case SDLK_d:
+                    light_angle = std::fmod(light_angle - ROT_SPEED, TWO_PI);
+                    break;
+                default:
+                    break;
+                }
+            case SDL_KEYUP:
+                break;
+            case SDL_QUIT:
+                quit = 1;
+                break;
+            default:
+                break;
+            }
         }
 
-        angle = std::fmod(angle + 0.1f, TWO_PI);
-        world.set_eye(vec3(cos(angle) * 3, 1, sin(angle) * 3));
+        world.set_eye(vec3(cos(eye_angle) * DISTANCE, 1, sin(eye_angle) * DISTANCE));
+        world.set_light(vec3(cos(light_angle) * DISTANCE, 1, sin(light_angle) * DISTANCE));
         framebuffer_renderer.render();
         frame.flip_image_on_x_axis();
 
@@ -93,7 +117,6 @@ int main() {
         SDL_RenderPresent(screen_renderer);
     }
 
-//    delete z_buffer; // deallocate z-buffer
     SDL_DestroyWindow(window);
     SDL_Quit();
     return 0;

@@ -18,15 +18,13 @@ void Renderer::render()
     frame.fill_frame_with_color(0xADD8E6);
     setup_zbuffer();
     
-    // TODO: refactor these functions to be not hardcoded, pass in args
     mat4 view = lookAt(world.get_eye(), world.get_look_at_pt());
     mat4 perspective = get_perspective_matrix();
     mat4 viewport = get_viewport_matrix();
 
     for (auto&[mesh, model] : world.get_meshes_in_world())
     {
-        mat4 model_view = view * inverse(model);
-        mat4 mv_t_inv = inverse(transpose(view * model));
+        mat4 model_view = view * model;
 
         for (Face& face : mesh.getFaces())
         {
@@ -34,6 +32,7 @@ void Renderer::render()
 
             for (Vertex& vertex : face.vertices)
             {
+                vec4 world_coords = vertex.position;
                 vec4 clip_coords = perspective * model_view * vertex.position;
                 vec4 normalized_device_coords = clip_coords / clip_coords.w; 
 
@@ -42,11 +41,13 @@ void Renderer::render()
                 viewport_coords.y = (int) viewport_coords.y; // Convert to int to avoid black gaps between triangles.
                 viewport_coords.w = clip_coords.w; // Keep wn (aka -z) for perspective-correct linear interpolation.
                  
+                float intensity = std::max(dot(vertex.normal, world.get_light()), 0.1f);
                 Vertex to_rasterize;
-                to_rasterize.clip_coords = clip_coords;
                 to_rasterize.position = viewport_coords;
                 to_rasterize.normal = inverse(transpose(model_view)) * vertex.normal; // Foundations of 3D Computer Graphics, 3.6
                 to_rasterize.uv = vertex.uv;
+                to_rasterize.world_coords = world_coords;
+                to_rasterize.intensity = intensity;
 
                 vrt_to_rasterize.push_back(to_rasterize);
             }
@@ -109,7 +110,8 @@ void Renderer::draw_triangle(const Vertex& v1, const Vertex& v2, const Vertex& v
                 // TODO: abstract shaders and varying variables
                 vec2 uv(((v1.uv/v1.position.w) * wn * b1) + ((v2.uv/v2.position.w) * wn * b2) + ((v3.uv/v3.position.w) * wn * b3));
                 vec3 normal(((v1.normal/v1.position.w) * wn * b1) + ((v2.normal/v2.position.w) * wn * b2) + ((v3.normal/v3.position.w) * wn * b3));
-                vec3 pos(((v1.clip_coords/v1.position.w) * wn * b1) + ((v2.clip_coords/v2.position.w) * wn * b2) + ((v3.clip_coords/v3.position.w) * wn * b3));
+                vec3 world_pos(((v1.world_coords/v1.position.w) * wn * b1) + ((v2.world_coords/v2.position.w) * wn * b2) + ((v3.world_coords/v3.position.w) * wn * b3));
+                float intensity(((v1.intensity/v1.position.w) * wn * b1) + ((v2.intensity/v2.position.w) * wn * b2) + ((v3.intensity/v3.position.w) * wn * b3));
 
                 float r = 255.0f, g = 255.0f, b = 255.0f;
                 if (texture != nullptr)
@@ -124,42 +126,29 @@ void Renderer::draw_triangle(const Vertex& v1, const Vertex& v2, const Vertex& v
                     b = (float) texture->data[idx++];
                 }
 
-                // vec3 fragment = vec3(pos.x, pos.y, wn).normalize();
-
-                float kd = 0.5f;
+                float ka = 0.1f;
+                float kd = 0.3f;
                 float ks = 0.6f;
 
-                // vec3 to_eye = vec3(world.get_eye() - fragment).normalize();
-                // vec3 to_light = vec3(world.get_light() - fragment).normalize();
-                // vec3 reflected = vec3((normal - to_light)  * (dot(normal, to_light)) * 2).normalize(); // Slide 7 of https://www.cs.utexas.edu/~bajaj/graphics2012/cs354/lectures/lect14.pdf
-
-                // float ambient = 0.3f;
-                // float diffuse = std::max(dot(normal, world.get_light()), 0.0f);
-                // float specular = std::pow(std::max(dot(to_eye, reflected), 0.0f), 2.0f);
-                // float phong_intensity = ambient + (kd * diffuse) + (ks * specular);
-                // uint32_t phong_color = SDL_MapRGBA(frame.pixel_format, r * phong_intensity, g * phong_intensity, b * phong_intensity, 255);
-                // phong_color = SDL_MapRGBA(frame.pixel_format, 255, 255, 255, 255);
-
-                vec3 fragment = vec3(pos.x, pos.y, wn).normalize();
-
+                vec3 fragment = world_pos;
                 vec3 to_eye = (world.get_eye() - fragment).normalize();
                 vec3 to_light = (world.get_light() - fragment).normalize();
                 // https://www.cs.utexas.edu/~bajaj/graphics2012/cs354/lectures/lect14.pdf
                 // slide 7
-                vec3 reflected = (normal - to_light) * (dot(normal, to_light)) * 2;
-                reflected.normalize_inplace();
+                normal.normalize_inplace();
+                vec3 proj_of_to_light_on_normal = (normal * dot(to_light, normal));
+                vec3 to_reflection_pos = (proj_of_to_light_on_normal - to_light) * 2;
+                vec3 reflected = to_light + to_reflection_pos;
 
-                float ambient = 0.3f;
-                float diffuse = std::max(dot(normal, world.get_light()), 0.0f);
+                float diffuse = std::max(dot(normal, to_light), 0.0f);
                 float specular = std::pow(std::max(dot(to_eye, reflected), 0.0f), 2.0f);
-                specular = std::max(std::pow(dot(to_eye, reflected), 8.0f), 0.0f);
 
-                float phong_term = ambient + (kd * diffuse) + (ks * specular);
+                float phong_term = ka + (kd * diffuse) + (ks * specular);
 
                 uint32_t phong_combined = SDL_MapRGBA(frame.pixel_format, r * phong_term, g * phong_term, b * phong_term, 255);
                 uint32_t just_phong = SDL_MapRGBA(frame.pixel_format, std::min(phong_term * 255, 255.0f), std::min(phong_term * 255, 255.0f), std::min(phong_term * 255, 255.0f), 255);
+                uint32_t gouraud_color = SDL_MapRGBA(frame.pixel_format, intensity * 255, intensity * 255, intensity * 255, 255);
 
-                // TODO: check if this is correct. we should be using > instead of <
                 if (wn < z_buffer[i + (j * frame.w)])
                 {
                     z_buffer[i + (j * frame.w)] = wn;
@@ -182,12 +171,10 @@ mat4 Renderer::lookAt(vec3 eye, vec3 target, vec3 up)
                         0, 0, 0, 1
                     );
 
-    vec3 forward = eye - target;
-    forward.normalize_inplace();
+    vec3 forward = (eye - target).normalize();
 
     // Be very careful with the order of these cross products.
-    vec3 left = cross(up, forward);
-    left.normalize_inplace();
+    vec3 left = cross(up.normalize(), forward).normalize();
 
     // Re-calculate our up vector using our forward and left vector.
     up = cross(forward, left);
@@ -198,13 +185,7 @@ mat4 Renderer::lookAt(vec3 eye, vec3 target, vec3 up)
                         0, 0, 0, 1
                     );
 
-    // Inverse of mR is equal to the transpose since all basis vectors are orthonormal.
-    // Why do we want to take the inverse? This is the matrix that gives us the rotation of the camera. We want to unrotate it.
-    // Since we've calculated the left vector, unrotating it will give us a camera facing down the -Z axis!!
-    mat4 mR_transpose = transpose(mR); 
-    mat4 mView = mR_transpose * mT;
-
-    return mView;
+    return inverse(mR) * mT;
 }
 
 // The math is from: http://www.songho.ca/opengl/gl_projectionmatrix.html#perspective
