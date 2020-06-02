@@ -26,12 +26,21 @@ else()
   message(FATAL_ERROR "OS ${CMAKE_SYSTEM_NAME} was not recognized")
 endif()
 
+# Allows us to build a Windows app in Visual Studio but still keep int main() as the entry point
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
+
+# Do not generate ZERO_CHECK
+set(CMAKE_SUPPRESS_REGENERATION true)
+
 # Add the executable, which should be built from the given source (.cpp) files.
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 
 # Directories to look in for includes when building the executable.
 target_include_directories(${PROJECT_NAME} PUBLIC src/)
-target_include_directories(${PROJECT_NAME} PUBLIC lib/)
+target_include_directories(${PROJECT_NAME} PUBLIC ext/)
+
+# Added this so policy CMP0065 doesn't scream
+set_target_properties(${PROJECT_NAME} PROPERTIES ENABLE_EXPORTS 0)
 
 # Link in SDL2.
 if (IS_OS_LINUX)
@@ -40,15 +49,14 @@ if (IS_OS_LINUX)
     pkg_search_module(SDL2 REQURIED sdl2)
 elseif (IS_OS_WINDOWS)
     set(SDL2_FOUND TRUE)
-    set(SDL2_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/ext/sdl/include/SDL")
-
+    set(SDL2_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/ext/sdl/include/SDL") 
     # Check if x64 or x86
     if (${CMAKE_SIZEOF_VOID_P} MATCHES "8")
         set(SDL2_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/ext/sdl/lib/SDL2-x64.lib")
-		set(SDL_DLL "${CMAKE_CURRENT_SOURCE_DIR}/ext/sdl/lib/SDL2-x64.dll")
+	set(SDL_DLL "${CMAKE_CURRENT_SOURCE_DIR}/ext/sdl/lib/SDL2-x64.dll")
     else()
         set(SDL2_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/ext/sdl/lib/SDL2-x86.lib")
-		set(SDL_DLL "${CMAKE_CURRENT_SOURCE_DIR}/ext/sdl/lib/SDL2-x86.dll")
+	set(SDL_DLL "${CMAKE_CURRENT_SOURCE_DIR}/ext/sdl/lib/SDL2-x86.dll")
     endif()
 
     # Copy and rename .dll's
@@ -56,6 +64,11 @@ elseif (IS_OS_WINDOWS)
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${SDL_DLL}"
         "$<TARGET_FILE_DIR:${PROJECT_NAME}>/SDL2.dll")
+
+    add_definitions("-DNOMINMAX")
+    add_definitions("-DWIN32_LEAN_AND_MEAN")
+    add_definitions("-D_SCL_SECURE_NO_WARNINGS")
+    add_definitions("-D_CRT_SECURE_NO_WARNINGS")
 endif()
 
 if (NOT SDL2_FOUND)
@@ -70,6 +83,4 @@ file(COPY obj/ DESTINATION "${PROJECT_BINARY_DIR}/obj")
 file(COPY img/ DESTINATION "${PROJECT_BINARY_DIR}/img")
 
 target_include_directories(${PROJECT_NAME} PUBLIC ${SDL2_INCLUDE_DIRS})
-if(IS_OS_LINUX)
-    target_link_libraries(${PROJECT_NAME} PUBLIC ${SDL2_LIBRARIES})
-endif()
+target_link_libraries(${PROJECT_NAME} PUBLIC ${SDL2_LIBRARIES})

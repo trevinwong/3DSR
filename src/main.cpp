@@ -15,7 +15,6 @@
 #include "rasterizer.h"
 
 #define trace(var)  { std::cout << "Line " << __LINE__ << ": " << #var << "=" << var << "\n";}
-
 #include "SDL.h"
 
 const inline int WINDOW_WIDTH = 800;
@@ -23,7 +22,7 @@ const inline int WINDOW_HEIGHT = 800;
 
 bool quit = false;
 
-int main() {
+int main(int argc, char * argv[]) {
     // Initialize event var. to store events when unqueueing them.
     SDL_Event event;
 
@@ -85,7 +84,7 @@ int main() {
             quit = (event.type == SDL_QUIT);
         }
 
-        angle = std::fmod(angle + 0.1f, TWO_PI);
+        angle = std::fmod(angle + 0.05f, TWO_PI);
         world.set_eye(vec3(cos(angle) * 3, 1, sin(angle) * 3));
         rasterizer.render();
         frame.flip_image_on_x_axis();
