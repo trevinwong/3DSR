@@ -90,3 +90,11 @@ class vec4
         float z = 0;
         float w = 0;
 };
+
+inline vec4 cross(const vec4& a, const vec4& b)
+{
+    return vec4((a.y * b.z - a.z * b.y),
+                (a.z * b.x - a.x * b.z), 
+                (a.x * b.y - a.y * b.x),
+                0);
+}

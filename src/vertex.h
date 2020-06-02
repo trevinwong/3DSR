@@ -5,21 +5,14 @@
 #include "texture.h"
 #include <vector>
 
-// A "vertex" is a point where two or more lines meet, but, in the context of this renderer, 
-// it is also a unit of information containing all the information the rasterizer needs.
-// TODO: I like "tinyrenderer's" abstraction of a shader. Look into trying to do something along the lines of that later. Not all vertex's should have the same attributes.
+// TODO: come up with some "vertex" class that better represents pure data parsed from the .obj file
+// TODO: come up with some "vertex" class that better represents varying variables at a vertex not just the pure data
 class Vertex
 {
     public:
-        vec3 local_coords;
+        vec4 position;
+        vec4 normal;
+        vec2 uv; 
         vec3 world_coords;
-        vec3 normal;
-        vec2 texture_coords;
-
-        vec4 viewport_coords;
-        vec4 clip_coords; 
-        // For Gouraud shading.
         float intensity;
-        // For Phong shading.
-        vec3 perspective_correct_normal;
 };
