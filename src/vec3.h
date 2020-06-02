@@ -3,6 +3,7 @@
 #include <cmath>
 #include <iostream>
 
+// TODO: swizzling? converting vec4 to vec3 and a vec3 to vec4 without getting circular dependencies
 // Implementation inspired by Eric Lengyel's in Foundations of Game Engine Development Vol 1.
 class vec3
 {

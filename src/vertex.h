@@ -5,7 +5,8 @@
 #include "texture.h"
 #include <vector>
 
-// TODO: come up with some vertex/shader abstraction for varying variables
+// TODO: come up with some "vertex" class that better represents pure data parsed from the .obj file
+// TODO: come up with some "vertex" class that better represents varying variables at a vertex not just the pure data
 class Vertex
 {
     public:

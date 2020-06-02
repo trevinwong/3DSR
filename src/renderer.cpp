@@ -5,9 +5,6 @@
 #include "utils.h"
 #include "vertex.h"
 
-// TODO: Rename to renderer.
-// Separate vertex pre-processing/vertex shader from rasterization/fragment shading.
-
 Renderer::Renderer(World& w, Frame& f) :
     world(w), frame(f)
 {
@@ -22,6 +19,7 @@ void Renderer::render()
     mat4 perspective = get_perspective_matrix();
     mat4 viewport = get_viewport_matrix();
 
+    // TODO: abstract vertex preprocessing step. "expose" it to shader abstraction
     for (auto&[mesh, model] : world.get_meshes_in_world())
     {
         mat4 model_view = view * model;
@@ -33,6 +31,7 @@ void Renderer::render()
             for (Vertex& vertex : face.vertices)
             {
                 vec4 world_coords = vertex.position;
+                // TODO: actually add clipping. reconstruct vertices outside of our screen. right now we have ghetto clipping by early outing of our rasterization
                 vec4 clip_coords = perspective * model_view * vertex.position;
                 vec4 normalized_device_coords = clip_coords / clip_coords.w; 
 
@@ -63,6 +62,7 @@ void Renderer::render()
     }
 }
 
+// TODO: expose rasterization step to shader abstraction
 void Renderer::draw_triangle(const Vertex& v1, const Vertex& v2, const Vertex& v3, const std::shared_ptr<Texture>& texture) 
 {
     vec2 v1_2d(v1.position);
@@ -108,6 +108,7 @@ void Renderer::draw_triangle(const Vertex& v1, const Vertex& v2, const Vertex& v
                 float wn = (1.0f/wn_reciprocal);
 
                 // TODO: abstract shaders and varying variables
+                // right now we have phong shading, but rasterization and interpolation of varying variables shouldn't be specific to a given shading model
                 vec2 uv(((v1.uv/v1.position.w) * wn * b1) + ((v2.uv/v2.position.w) * wn * b2) + ((v3.uv/v3.position.w) * wn * b3));
                 vec3 normal(((v1.normal/v1.position.w) * wn * b1) + ((v2.normal/v2.position.w) * wn * b2) + ((v3.normal/v3.position.w) * wn * b3));
                 vec3 world_pos(((v1.world_coords/v1.position.w) * wn * b1) + ((v2.world_coords/v2.position.w) * wn * b2) + ((v3.world_coords/v3.position.w) * wn * b3));

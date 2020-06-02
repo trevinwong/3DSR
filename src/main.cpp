@@ -46,16 +46,17 @@ int main() {
     Frame frame(WINDOW_WIDTH, WINDOW_HEIGHT, SDL_AllocFormat(SDL_PIXELFORMAT_ARGB8888));
 
     auto texture = std::make_shared<Texture>("img/african_head_diffuse.tga"); 
+
+    // TODO: convert everything to smart pointers
     Mesh mesh("obj/african_head.obj", texture);
 
-    // Should be allocated as a smart ptr
     Object head(&mesh);
-    mat4 model = makeTranslation(0, 0, 0);
 
     World world;
     world.addObject(&head);
 
-    // DEPRECATED
+    // DEPRECATED, should be replaced with Object abstraction model
+    mat4 model = makeTranslation(0, 0, 0);
     world.add_mesh_to_world(mesh, model);
     world.set_light(vec3(0, 0, 3));
     world.set_eye(vec3(0, 1, 3));
@@ -103,15 +104,15 @@ int main() {
             }
         }
 
+        // TODO: Abstract rotation
         world.set_eye(vec3(cos(eye_angle) * DISTANCE, 1, sin(eye_angle) * DISTANCE));
         world.set_light(vec3(cos(light_angle) * DISTANCE, 1, sin(light_angle) * DISTANCE));
+
         framebuffer_renderer.render();
         frame.flip_image_on_x_axis();
 
-        // Replace the screen with our frame buffer.
-        // The last argument is the number of bytes between one row and the next.
         SDL_UpdateTexture(screen, NULL, frame.buffer, WINDOW_WIDTH * sizeof(uint32_t));
-
+        
         SDL_RenderClear(screen_renderer);
         SDL_RenderCopy(screen_renderer, screen, NULL, NULL);
         SDL_RenderPresent(screen_renderer);
