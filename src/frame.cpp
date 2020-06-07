@@ -69,7 +69,7 @@ void Frame::flip_image_on_x_axis()
     {
         for (int i = 0; i < w; i++)
         {
-            std::swap(buffer[(j*w) + i], buffer[(h-j)*w +i]); 
+            std::swap(buffer[(j*w) + i], buffer[(h-1-j)*w +i]); 
         }
     }
 }
