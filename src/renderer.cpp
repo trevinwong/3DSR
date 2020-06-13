@@ -30,7 +30,6 @@ void Renderer::render()
 
             for (Vertex& vertex : face.vertices)
             {
-                vec4 world_coords = vertex.position;
                 // TODO: actually add clipping. reconstruct vertices outside of our screen. right now we have ghetto clipping by early outing of our rasterization
                 vec4 clip_coords = perspective * model_view * vertex.position;
                 vec4 normalized_device_coords = clip_coords / clip_coords.w; 
@@ -44,8 +43,10 @@ void Renderer::render()
                 Vertex to_rasterize;
                 to_rasterize.position = viewport_coords;
                 to_rasterize.normal = inverse(transpose(model_view)) * vertex.normal; // Foundations of 3D Computer Graphics, 3.6
+                // If we're doing Phong shading, we want to keep our normals in world-space.
+                to_rasterize.normal = vertex.normal;
                 to_rasterize.uv = vertex.uv;
-                to_rasterize.world_coords = world_coords;
+                to_rasterize.world_coords = vertex.position;
                 to_rasterize.intensity = intensity;
 
                 vrt_to_rasterize.push_back(to_rasterize);
@@ -110,8 +111,8 @@ void Renderer::draw_triangle(const Vertex& v1, const Vertex& v2, const Vertex& v
                 // TODO: abstract shaders and varying variables
                 // right now we have phong shading, but rasterization and interpolation of varying variables shouldn't be specific to a given shading model
                 vec2 uv(((v1.uv/v1.position.w) * wn * b1) + ((v2.uv/v2.position.w) * wn * b2) + ((v3.uv/v3.position.w) * wn * b3));
-                vec3 normal(((v1.normal/v1.position.w) * wn * b1) + ((v2.normal/v2.position.w) * wn * b2) + ((v3.normal/v3.position.w) * wn * b3));
-                vec3 world_pos(((v1.world_coords/v1.position.w) * wn * b1) + ((v2.world_coords/v2.position.w) * wn * b2) + ((v3.world_coords/v3.position.w) * wn * b3));
+                vec3 normal((v1.normal * b1)  + (v2.normal * b2) + (v3.normal * b3));
+                vec3 world_pos((v1.world_coords * b1) + (v2.world_coords * b2) + (v3.world_coords * b3));
                 float intensity(((v1.intensity/v1.position.w) * wn * b1) + ((v2.intensity/v2.position.w) * wn * b2) + ((v3.intensity/v3.position.w) * wn * b3));
 
                 float r = 255.0f, g = 255.0f, b = 255.0f;
@@ -131,9 +132,8 @@ void Renderer::draw_triangle(const Vertex& v1, const Vertex& v2, const Vertex& v
                 float kd = 0.3f;
                 float ks = 0.6f;
 
-                vec3 fragment = world_pos;
-                vec3 to_eye = (world.get_eye() - fragment).normalize();
-                vec3 to_light = (world.get_light() - fragment).normalize();
+                vec3 to_eye = (world.get_eye() - world_pos).normalize();
+                vec3 to_light = (world.get_light() - world_pos).normalize();
                 // https://www.cs.utexas.edu/~bajaj/graphics2012/cs354/lectures/lect14.pdf
                 // slide 7
                 normal.normalize_inplace();
@@ -177,7 +177,7 @@ mat4 Renderer::lookAt(vec3 eye, vec3 target, vec3 up)
     // Be very careful with the order of these cross products.
     vec3 left = cross(up.normalize(), forward).normalize();
 
-    // Re-calculate our up vector using our forward and left vector.
+    // Re-calculate our up vector using our forward and left vector, which is already normalized due to operating on two normalized vectors.
     up = cross(forward, left);
 
     mat4 mR         (   left.x, up.x, forward.x, 0,
