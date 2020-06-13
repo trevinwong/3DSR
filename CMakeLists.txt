@@ -28,8 +28,6 @@ else()
   message(FATAL_ERROR "OS ${CMAKE_SYSTEM_NAME} was not recognized")
 endif()
 
-# Allows us to build a Windows app in Visual Studio but still keep int main() as the entry point
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
 
 # Do not generate ZERO_CHECK
 set(CMAKE_SUPPRESS_REGENERATION true)
@@ -50,8 +48,10 @@ if (IS_OS_LINUX)
     find_package(PkgConfig REQUIRED)
     pkg_search_module(SDL2 REQURIED sdl2)
 elseif (IS_OS_WINDOWS)
+    # Allows us to build a Windows app in Visual Studio but still keep int main() as the entry point
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
     set(SDL2_FOUND TRUE)
-    set(SDL2_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/ext/sdl/include/SDL") 
+    set(SDL2_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/ext/sdl/include/SDL")
     # Check if x64 or x86
     if (${CMAKE_SIZEOF_VOID_P} MATCHES "8")
         set(SDL2_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/ext/sdl/lib/SDL2-x64.lib")
