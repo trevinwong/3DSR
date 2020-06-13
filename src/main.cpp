@@ -17,7 +17,6 @@
 #include "renderer.h"
 
 #define trace(var)  { std::cout << "Line " << __LINE__ << ": " << #var << "=" << var << "\n";}
-
 #include "SDL.h"
 
 const inline int WINDOW_WIDTH = 800;
@@ -25,7 +24,7 @@ const inline int WINDOW_HEIGHT = 800;
 
 bool quit = false;
 
-int main() {
+int main(int argc, char * argv[]) {
     SDL_Event event;
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0)

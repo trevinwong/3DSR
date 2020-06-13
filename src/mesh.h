@@ -6,7 +6,7 @@
 #include <memory>
 #include <vector>
 #include <string_view>
-#include "../lib/tiny_obj_loader.h"
+#include "../ext/tiny_obj_loader.h"
 
 class Mesh
 {
