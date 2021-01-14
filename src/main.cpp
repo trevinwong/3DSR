@@ -27,8 +27,10 @@ bool quit = false;
 int main(int argc, char * argv[]) {
     SDL_Event event;
 
-    if (SDL_Init(SDL_INIT_VIDEO) < 0)
-            return 1;
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+        SDL_Log("Unable to initialize SDL: %s", SDL_GetError());
+        return 1;
+    }
 
     SDL_Window* window = SDL_CreateWindow("3DSR",
                     SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
@@ -53,13 +55,6 @@ int main(int argc, char * argv[]) {
 
     World world;
     world.addObject(&head);
-
-    // DEPRECATED, should be replaced with Object abstraction model
-    mat4 model = makeTranslation(0, 0, 0);
-    world.add_mesh_to_world(mesh, model);
-    world.set_light(vec3(0, 0, 3));
-    world.set_eye(vec3(0, 1, 3));
-    world.set_look_at_pt(vec3(0,0,0));
 
     Renderer framebuffer_renderer(world, frame);
 

@@ -1,18 +1,5 @@
 #include "world.h"
 
-
-// DEPRECATED
-void World::add_mesh_to_world(Mesh& mesh, const mat4& transformation)
-{
-    meshes_in_world.push_back(std::pair(mesh, transformation));
-}
-
-// DEPRECATED
-std::vector<std::pair<Mesh, mat4>>& World::get_meshes_in_world()
-{
-    return meshes_in_world;
-}
-
 void World::addObject(Object* object)
 {
     objects.push_back(object);

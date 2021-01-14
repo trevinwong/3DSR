@@ -8,10 +8,6 @@ class World
     public:
         World() = default;
 
-        // DEPRECATED
-        void add_mesh_to_world(Mesh& mesh, const mat4& transformation);
-        std::vector<std::pair<Mesh, mat4>>& get_meshes_in_world();
-
         void addObject(Object* object);
         std::vector<Object*>& getObjects();
         
@@ -25,10 +21,6 @@ class World
         const vec3& get_look_at_pt() const;
     private:
         std::vector<Object*> objects;
-
-        // DEPRECATED
-        // A mesh and its transformation in the world.
-        std::vector<std::pair<Mesh, mat4>> meshes_in_world;
 
         vec3 light;
         vec3 eye;

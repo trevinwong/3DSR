@@ -20,11 +20,14 @@ void Renderer::render()
     mat4 viewport = get_viewport_matrix();
 
     // TODO: abstract vertex preprocessing step. "expose" it to shader abstraction
-    for (auto&[mesh, model] : world.get_meshes_in_world())
+    for (Object* object : world.getObjects())
     {
+        Mesh* mesh = object->getMesh();
+        mat4 model = object->getMat();
+
         mat4 model_view = view * model;
 
-        for (Face& face : mesh.getFaces())
+        for (Face& face : mesh->getFaces())
         {
             std::vector<Vertex> vrt_to_rasterize;
 
@@ -58,7 +61,7 @@ void Renderer::render()
             // If -wn: vertices are CW, aka facing the back-side
             float backface = ((vrt_to_rasterize[2].position.x - vrt_to_rasterize[1].position.x) * (vrt_to_rasterize[0].position.y - vrt_to_rasterize[1].position.y)) -
                              ((vrt_to_rasterize[2].position.y - vrt_to_rasterize[1].position.y) * (vrt_to_rasterize[0].position.x - vrt_to_rasterize[1].position.x));
-            if (backface > 0) { draw_triangle(vrt_to_rasterize[0], vrt_to_rasterize[1], vrt_to_rasterize[2], mesh.getTexture()); }
+            if (backface > 0) { draw_triangle(vrt_to_rasterize[0], vrt_to_rasterize[1], vrt_to_rasterize[2], mesh->getTexture()); }
         }
     }
 }
