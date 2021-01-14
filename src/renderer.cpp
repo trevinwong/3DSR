@@ -23,7 +23,7 @@ void Renderer::render()
     for (Object* object : world.getObjects())
     {
         Mesh* mesh = object->getMesh();
-        mat4 model = object->getMat();
+        mat4 model = *object->getMat();
 
         mat4 model_view = view * model;
 

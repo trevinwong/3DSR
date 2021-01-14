@@ -47,11 +47,10 @@ int main(int argc, char * argv[]) {
     Frame frame(WINDOW_WIDTH, WINDOW_HEIGHT, SDL_AllocFormat(SDL_PIXELFORMAT_ARGB8888));
 
     auto texture = std::make_shared<Texture>("img/african_head_diffuse.tga"); 
+    auto mesh = std::make_unique<Mesh>("obj/african_head.obj", texture);    
+    auto model = std::make_unique<mat4>(makeTranslation(0,0,0));
 
-    // TODO: convert everything to smart pointers
-    Mesh mesh("obj/african_head.obj", texture);
-
-    Object head(&mesh);
+    Object head(std::move(mesh), std::move(model));
 
     World world;
     world.addObject(&head);

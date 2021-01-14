@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 #include "mesh.h"
 #include "mat4.h"
 
@@ -8,12 +9,11 @@ class Object
 {
     public:
         Object() = default;
-        Object(Mesh* m);
+        Object(std::unique_ptr<Mesh> Mesh, std::unique_ptr<mat4> Mat);
 
         Mesh* getMesh() const;
-        mat4& getMat();
-        const mat4& getMat() const;
+        mat4* getMat() const;
     private:
-        Mesh* mesh = nullptr;
-        mat4 mat;
+        std::unique_ptr<Mesh> mesh;
+        std::unique_ptr<mat4> mat;
 };
