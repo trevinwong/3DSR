@@ -22,10 +22,10 @@ void Renderer::render()
     // TODO: abstract vertex preprocessing step. "expose" it to shader abstraction
     for (Object* object : world.getObjects())
     {
-        Mesh* mesh = object->getMesh();
-        mat4 model = *object->getMat();
+        std::shared_ptr<Mesh>& mesh = object->getMesh();
+        std::unique_ptr<mat4>& model = object->getMat();
 
-        mat4 model_view = view * model;
+        mat4 model_view = view * (*model);
 
         for (Face& face : mesh->getFaces())
         {

@@ -9,11 +9,11 @@ class Object
 {
     public:
         Object() = default;
-        Object(std::unique_ptr<Mesh> Mesh, std::unique_ptr<mat4> Mat);
+        Object(std::shared_ptr<Mesh> Mesh, std::unique_ptr<mat4> Mat);
 
-        Mesh* getMesh() const;
-        mat4* getMat() const;
+        std::shared_ptr<Mesh>& getMesh();
+        std::unique_ptr<mat4>& getMat();
     private:
-        std::unique_ptr<Mesh> mesh;
-        std::unique_ptr<mat4> mat;
+        std::shared_ptr<Mesh> mesh = nullptr;
+        std::unique_ptr<mat4> mat = nullptr;
 };

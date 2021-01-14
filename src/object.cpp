@@ -1,16 +1,16 @@
 #include "object.h"
 
-Object::Object(std::unique_ptr<Mesh> Mesh, std::unique_ptr<mat4> Mat)
+Object::Object(std::shared_ptr<Mesh> Mesh, std::unique_ptr<mat4> Mat)
     : mesh(std::move(Mesh)), mat(std::move(Mat))
 {
 }
 
-Mesh* Object::getMesh() const
+std::shared_ptr<Mesh>& Object::getMesh()
 {
-    return mesh.get();
+    return mesh;
 }
 
-mat4* Object::getMat() const
+std::unique_ptr<mat4>& Object::getMat()
 {
-    return mat.get();
+    return mat;
 }
