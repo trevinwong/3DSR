@@ -15,6 +15,7 @@
 #include "mesh.h"
 #include "world.h"
 #include "renderer.h"
+#include "shaders/gouraud_shader.h"
 
 #define trace(var)  { std::cout << "Line " << __LINE__ << ": " << #var << "=" << var << "\n";}
 #include "SDL.h"
@@ -55,7 +56,9 @@ int main(int argc, char * argv[]) {
     World world;
     world.addObject(&head);
 
-    Renderer framebuffer_renderer(world, frame);
+    GouraudShader shader(world, frame);
+    
+    Renderer framebuffer_renderer(world, frame, shader);
 
     double eye_angle = M_PI/2;
     double light_angle = M_PI/2;

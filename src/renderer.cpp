@@ -5,47 +5,92 @@
 #include "utils.h"
 #include "vertex.h"
 
-Renderer::Renderer(World& w, Frame& f) :
-    world(w), frame(f)
+Renderer::Renderer(World& w, Frame& f, Shader& s) :
+    world(w), frame(f), shader(s)
 {
+}
+
+void Renderer::draw_triangle_new(std::vector<vec4> coords)
+{
+    std::vector<vec2> screen_coords;
+    screen_coords.push_back(vec2(coords[0]));
+    screen_coords.push_back(vec2(coords[1]));
+    screen_coords.push_back(vec2(coords[2]));
+
+    vec2 edge0 = (screen_coords[1] - screen_coords[0]);
+    vec2 edge1 = (screen_coords[2] - screen_coords[1]);
+    vec2 edge2 = (screen_coords[0] - screen_coords[2]);
+
+    int min_x = std::max(min3(screen_coords[0].x, screen_coords[1].x, screen_coords[2].x), 0);
+    int max_x = std::min(max3(screen_coords[0].x, screen_coords[1].x, screen_coords[2].x), frame.w - 1);
+    int min_y = std::max(min3(screen_coords[0].y, screen_coords[1].y, screen_coords[2].y), 0);
+    int max_y = std::min(max3(screen_coords[0].y, screen_coords[1].y, screen_coords[2].y), frame.h - 1);
+
+    for (int i = min_x; i <= max_x; i++)
+    {
+        for (int j = min_y; j <= max_y; j++)
+        {
+            vec2 point(i,j);
+            vec2 v0_to_point = point - vec2(screen_coords[0]);
+            vec2 v1_to_point = point - vec2(screen_coords[1]);
+            vec2 v2_to_point = point - vec2(screen_coords[2]);
+
+            float v0v1p = cross(edge0, v0_to_point); 
+            float v1v2p = cross(edge1, v1_to_point); 
+            float v2v0p = cross(edge2, v2_to_point); 
+
+            if (v0v1p >= 0 && v1v2p >= 0 && v2v0p >= 0)
+            {
+                float v0v1v2 = cross(screen_coords[1] - screen_coords[0], screen_coords[2] - screen_coords[0]);
+                if (v0v1v2 == 0) return; // Discard degenerate triangles, whose area is 0.
+
+                float b1 = v1v2p / v0v1v2;
+                float b2 = v2v0p / v0v1v2;
+                float b3 = v0v1p / v0v1v2;
+
+                // Rational linear interpolation.
+                // https://www.scratchapixel.com/lessons/3d-basic-rendering/rasterization-practical-implementation/visibility-problem-depth-buffer-depth-interpolation
+                // Foundations of 3D Computer Graphics, Ch 13
+                // Remember that we store the z-value inside of our w
+                float wn_reciprocal = (b1 * (1.0f/coords[0].w)) + (b2 * (1.0f/coords[1].w)) + (b3 * (1.0f/coords[2].w));
+                float wn = (1.0f/wn_reciprocal);
+
+                if (wn < z_buffer[i + (j * frame.w)])
+                {
+                    z_buffer[i + (j * frame.w)] = wn;
+                    uint32_t black = SDL_MapRGBA(frame.pixel_format, 0, 0, 0, 255);
+                    frame.set_pixel(i, j, black);
+                }
+            }
+        }
+    }
 }
 
 void Renderer::render()
 {
     frame.fill_frame_with_color(0xADD8E6);
     setup_zbuffer();
-    
-    mat4 view = lookAt(world.get_eye(), world.get_look_at_pt());
-    mat4 perspective = get_perspective_matrix();
-    mat4 viewport = get_viewport_matrix();
 
-    // TODO: abstract vertex preprocessing step. "expose" it to shader abstraction
     for (Object* object : world.getObjects())
     {
         std::shared_ptr<Mesh>& mesh = object->getMesh();
-        std::unique_ptr<mat4>& model = object->getMat();
-
-        mat4 model_view = view * (*model);
+        mat4 Model = *object->getMat();
 
         for (Face& face : mesh->getFaces())
         {
-            std::vector<Vertex> vrt_to_rasterize;
+            std::vector<vec4> coords;
+            std::vector<Vertex> vrt_to_rasterize; // DEPRECATED
 
             for (Vertex& vertex : face.vertices)
             {
-                // TODO: actually add clipping. reconstruct vertices outside of our screen. right now we have ghetto clipping by early outing of our rasterization
-                vec4 clip_coords = perspective * model_view * vertex.position;
-                vec4 normalized_device_coords = clip_coords / clip_coords.w; 
-
-                vec4 viewport_coords = viewport * normalized_device_coords;
-                viewport_coords.x = (int) viewport_coords.x; // Convert to int to avoid black gaps between triangles.
-                viewport_coords.y = (int) viewport_coords.y; // Convert to int to avoid black gaps between triangles.
-                viewport_coords.w = clip_coords.w; // Keep wn (aka -z) for perspective-correct linear interpolation.
+                coords.push_back(shader.vertex(Model * vertex.position));
                  
                 float intensity = std::max(dot(vertex.normal, world.get_light()), 0.1f);
+
+                // DEPRECATED
                 Vertex to_rasterize;
-                to_rasterize.position = viewport_coords;
-                to_rasterize.normal = inverse(transpose(model_view)) * vertex.normal; // Foundations of 3D Computer Graphics, 3.6
+                // to_rasterize.position = viewport_coords;
+                // to_rasterize.normal = inverse(transpose(model_view)) * vertex.normal; // Foundations of 3D Computer Graphics, 3.6
                 // If we're doing Phong shading, we want to keep our normals in world-space.
                 to_rasterize.normal = vertex.normal;
                 to_rasterize.uv = vertex.uv;
@@ -59,13 +104,16 @@ void Renderer::render()
             // Calculate the direction of the normal of the screen-space triangle, which is either towards -wn or +wn
             // If +wn: vertices are CCW, aka facing the front-side
             // If -wn: vertices are CW, aka facing the back-side
-            float backface = ((vrt_to_rasterize[2].position.x - vrt_to_rasterize[1].position.x) * (vrt_to_rasterize[0].position.y - vrt_to_rasterize[1].position.y)) -
-                             ((vrt_to_rasterize[2].position.y - vrt_to_rasterize[1].position.y) * (vrt_to_rasterize[0].position.x - vrt_to_rasterize[1].position.x));
-            if (backface > 0) { draw_triangle(vrt_to_rasterize[0], vrt_to_rasterize[1], vrt_to_rasterize[2], mesh->getTexture()); }
+            // float backface = ((vrt_to_rasterize[2].position.x - vrt_to_rasterize[1].position.x) * (vrt_to_rasterize[0].position.y - vrt_to_rasterize[1].position.y)) -
+            //                  ((vrt_to_rasterize[2].position.y - vrt_to_rasterize[1].position.y) * (vrt_to_rasterize[0].position.x - vrt_to_rasterize[1].position.x));
+            // // if (backface > 0) { draw_triangle(vrt_to_rasterize[0], vrt_to_rasterize[1], vrt_to_rasterize[2], mesh->getTexture()); }
+            // if (backface > 0) { draw_triangle_new(coords); }
+            draw_triangle_new(coords);
         }
     }
 }
 
+// DEPRECATED
 // TODO: expose rasterization step to shader abstraction
 void Renderer::draw_triangle(const Vertex& v1, const Vertex& v2, const Vertex& v3, const std::shared_ptr<Texture>& texture) 
 {
@@ -162,72 +210,6 @@ void Renderer::draw_triangle(const Vertex& v1, const Vertex& v2, const Vertex& v
         }
     }
 }
-
-// Constructs a view matrix given the position of the eye and the target.
-// Use the unit vector pointing up as our temporary up vector, if none is specified.
-mat4 Renderer::lookAt(vec3 eye, vec3 target, vec3 up)
-{
-    // Translate eye position back to origin.
-    // Our calculations assume that our eye is positioned at the origin and looks down the -Z axis.
-    mat4 mT         (   1, 0, 0, -eye.x,
-                        0, 1, 0, -eye.y,
-                        0, 0, 1, -eye.z,
-                        0, 0, 0, 1
-                    );
-
-    vec3 forward = (eye - target).normalize();
-
-    // Be very careful with the order of these cross products.
-    vec3 left = cross(up.normalize(), forward).normalize();
-
-    // Re-calculate our up vector using our forward and left vector, which is already normalized due to operating on two normalized vectors.
-    up = cross(forward, left);
-
-    mat4 mR         (   left.x, up.x, forward.x, 0,
-                        left.y, up.y, forward.y, 0,
-                        left.z, up.z, forward.z, 0,
-                        0, 0, 0, 1
-                    );
-
-    return inverse(mR) * mT;
-}
-
-// The math is from: http://www.songho.ca/opengl/gl_projectionmatrix.html#perspective
-// NOTE: this assumes n and f are both positive!!!
-// NOTE: this transforms the coordinates into NDCS coordinates, which FLIPS the direction of our wn-axis, essentially
-// Our camera typically looks down the negative wn-axis but after transforming the coordinates it looks down the positive wn-axis.
-// This means your wn-buffer implementation needs to change: closer coordinates should be SMALLER, not LARGER
-// Construct the perspective matrix.
-mat4 Renderer::get_perspective_matrix()
-{
-    float t = 1.0f;
-    float b = -t;
-    float r = 1.0f;
-    float l = -r;
-    float n = 1.8f;
-    float f = 10.0f;
-
-    mat4 perspective(   
-                        2*n/(r-l), 0,         (r+l)/(r-l),      0,
-                        0,         2*n/(t-b), (t+b)/(t-b),      0,
-                        0,         0,         -(f + n)/(f - n), -2*(f * n)/(f - n),
-                        0,         0,         -1,               0
-                    );
-    return perspective;
-}
-
-// Transforms the canonical cube (which ranges from [-1,-1,-1] to [1,1,1]) to range from [0,0,0] to [W,H,1].
-mat4 Renderer::get_viewport_matrix()
-{
-    mat4 viewport(   
-                    frame.w/2, 0,         0,   (frame.w)/2,
-                    0,         frame.h/2, 0,   (frame.h)/2,
-                    0,         0,         1/2, 1/2,
-                    0,         0,         0,   1
-                );
-    return viewport;
-}
-
 void Renderer::setup_zbuffer()
 {
     z_buffer = new float[frame.w * frame.h];
