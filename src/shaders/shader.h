@@ -15,7 +15,7 @@ class Shader
         {
         }
 
-        virtual vec4 vertex(vec4 model_coords)=0;
+        virtual vec4 vertex(Vertex& vertex, mat4& model)=0;
         virtual bool fragment(float& color)=0;
     protected:
         World& world;

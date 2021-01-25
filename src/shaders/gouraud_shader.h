@@ -14,10 +14,12 @@ class GouraudShader : public Shader
         {
         }
 
-        vec4 vertex(vec4 model_coords) override
+        vec4 vertex(Vertex& vertex, mat4& model) override
         {
+            intensity = std::max(dot(vertex.normal, world.get_light()), 0.1f);
             // TODO: pass in t,b,l,r,n,f for perspective
             // TODO: do actual clipping?
+            vec4 model_coords = model * vertex.position;
             vec4 clip_coords = perspective() * lookAt(world.get_eye(), world.get_look_at_pt()) * model_coords;
             vec4 ndcs = clip_coords / clip_coords.w; 
             vec4 viewport_coords = viewport(frame) * ndcs;
@@ -31,4 +33,6 @@ class GouraudShader : public Shader
         {
             return false;
         }
+    private:
+        float intensity;
 };
