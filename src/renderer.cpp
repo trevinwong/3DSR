@@ -104,11 +104,9 @@ void Renderer::render()
             // Calculate the direction of the normal of the screen-space triangle, which is either towards -wn or +wn
             // If +wn: vertices are CCW, aka facing the front-side
             // If -wn: vertices are CW, aka facing the back-side
-            // float backface = ((vrt_to_rasterize[2].position.x - vrt_to_rasterize[1].position.x) * (vrt_to_rasterize[0].position.y - vrt_to_rasterize[1].position.y)) -
-            //                  ((vrt_to_rasterize[2].position.y - vrt_to_rasterize[1].position.y) * (vrt_to_rasterize[0].position.x - vrt_to_rasterize[1].position.x));
-            // // if (backface > 0) { draw_triangle(vrt_to_rasterize[0], vrt_to_rasterize[1], vrt_to_rasterize[2], mesh->getTexture()); }
-            // if (backface > 0) { draw_triangle_new(coords); }
-            draw_triangle_new(coords);
+            float backface = ((coords[2].x - coords[1].x) * (coords[0].y - coords[1].y)) -
+                             ((coords[2].y - coords[1].y) * (coords[0].x - coords[1].x));
+            if (backface > 0) { draw_wireframe_triangle(coords); }
         }
     }
 }
@@ -219,7 +217,14 @@ void Renderer::setup_zbuffer()
     }
 }
 
-void Renderer::draw_line(int x0, int y0, int x1, int y1, Frame& frame)
+void Renderer::draw_wireframe_triangle(std::vector<vec4> coords)
+{
+    draw_line(coords[0].x, coords[0].y, coords[1].x, coords[1].y);
+    draw_line(coords[1].x, coords[1].y, coords[2].x, coords[2].y);
+    draw_line(coords[2].x, coords[2].y, coords[0].x, coords[0].y);
+}
+
+void Renderer::draw_line(int x0, int y0, int x1, int y1)
 {
     int x = x0;
     int y = y0;
@@ -272,12 +277,4 @@ void Renderer::draw_line(int x0, int y0, int x1, int y1, Frame& frame)
             ++x;
         }
     }
-}
-
-
-void Renderer::draw_line(vec3& v1, vec3& v2, vec3& v3, Frame& frame)
-{
-    draw_line(v1.x, v1.y, v2.x, v2.y, frame);
-    draw_line(v2.x, v2.y, v3.x, v3.y, frame);
-    draw_line(v3.x, v3.y, v1.x, v1.y, frame);
 }

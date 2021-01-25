@@ -18,8 +18,8 @@ class Renderer
         void render();
 
     private:
-        void draw_line(int x0, int y0, int x1, int y1, Frame& frame);
-        void draw_line(vec3& v0, vec3& v1, vec3& v2, Frame& frame);
+        void draw_wireframe_triangle(std::vector<vec4> coords);
+        void draw_line(int x0, int y0, int x1, int y1);
 
         void draw_triangle_new(std::vector<vec4> coords);
         void draw_triangle(const Vertex& v0, const Vertex& v1, const Vertex& v2, const std::shared_ptr<Texture>& texture);
