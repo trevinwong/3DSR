@@ -101,7 +101,6 @@ int main(int argc, char * argv[]) {
             }
         }
 
-        // TODO: Abstract rotation
         world.set_eye(vec3(cos(eye_angle) * DISTANCE, 1, sin(eye_angle) * DISTANCE));
         world.set_light(vec3(cos(light_angle) * DISTANCE, 1, sin(light_angle) * DISTANCE));
 
