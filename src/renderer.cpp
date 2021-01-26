@@ -54,12 +54,14 @@ void Renderer::draw_triangle_new(std::vector<vec4> coords)
                 // Remember that we store the z-value inside of our w
                 float wn_reciprocal = (b1 * (1.0f/coords[0].w)) + (b2 * (1.0f/coords[1].w)) + (b3 * (1.0f/coords[2].w));
                 float wn = (1.0f/wn_reciprocal);
+				vec4 barycentric(b1, b2, b3, wn);
+				uint32_t color;
+				bool discard = shader.fragment(barycentric, color);
 
-                if (wn < z_buffer[i + (j * frame.w)])
+                if (!discard && wn < z_buffer[i + (j * frame.w)])
                 {
                     z_buffer[i + (j * frame.w)] = wn;
-                    uint32_t black = SDL_MapRGBA(frame.pixel_format, 0, 0, 0, 255);
-                    frame.set_pixel(i, j, black);
+                    frame.set_pixel(i, j, color);
                 }
             }
         }
@@ -78,11 +80,12 @@ void Renderer::render()
 
         for (Face& face : mesh->getFaces())
         {
+			int num_vert = 0;
             std::vector<vec4> coords;
 
             for (Vertex& vertex : face.vertices)
             {
-                coords.push_back(shader.vertex(vertex, model));
+                coords.push_back(shader.vertex(vertex, model, num_vert++));
             }
 
             // Foundations of 3D Computer Graphics, 12.2

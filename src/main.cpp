@@ -25,6 +25,7 @@ const inline int WINDOW_HEIGHT = 800;
 
 bool quit = false;
 
+#undef main // windows fix: unresolved external symbol https://stackoverflow.com/questions/4845410/error-lnk2019-unresolved-external-symbol-main-referenced-in-function-tmainc
 int main(int argc, char * argv[]) {
     SDL_Event event;
 

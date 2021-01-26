@@ -14,9 +14,12 @@ class GouraudShader : public Shader
         {
         }
 
-        vec4 vertex(Vertex& vertex, mat4& model) override
+        vec4 vertex(const Vertex& vertex, const mat4& model, int num_vert) override
         {
-            intensity = std::max(dot(vertex.normal, world.get_light()), 0.1f);
+			// https://www.scratchapixel.com/lessons/3d-basic-rendering/rasterization-practical-implementation/perspective-correct-interpolation-vertex-attributes
+			// we must divide vertex attributes by z first before linearly interpolating
+			intensities[num_vert] = std::max(dot(vertex.normal, world.get_light()), 0.1f) / vertex.position.w;
+
             // TODO: pass in t,b,l,r,n,f for perspective
             // TODO: do actual clipping?
             vec4 model_coords = model * vertex.position;
@@ -29,10 +32,12 @@ class GouraudShader : public Shader
             return viewport_coords;
         }
 
-        bool fragment(float& color) override
+        bool fragment(const vec4& barycentric, uint32_t& color) override
         {
+			float interpolated_intensity = barycentric.w * ((intensities[0] * barycentric.x) + (intensities[1] * barycentric.y) + (intensities[2] * barycentric.z));
+			color = SDL_MapRGBA(frame.pixel_format, interpolated_intensity * 255, interpolated_intensity * 255, interpolated_intensity * 255, 255);
             return false;
         }
     private:
-        float intensity;
+        vec3 intensities;
 };

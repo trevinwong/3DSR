@@ -2,6 +2,7 @@
 #include "../world.h"
 #include "../frame.h"
 #include "../vec4.h"
+#include "../vec3.h"
 
 class Shader
 {
@@ -15,8 +16,8 @@ class Shader
         {
         }
 
-        virtual vec4 vertex(Vertex& vertex, mat4& model)=0;
-        virtual bool fragment(float& color)=0;
+        virtual vec4 vertex(const Vertex& vertex, const mat4& model, int num_vert)=0;
+        virtual bool fragment(const vec4& barycentric, uint32_t& color)=0;
     protected:
         World& world;
         Frame& frame;

@@ -17,6 +17,23 @@ set(SOURCE_FILES
   src/mesh.cpp
   src/world.cpp
   src/renderer.cpp
+  src/color.h
+  src/face.h
+  src/frame.h
+  src/graphics.h
+  src/mat4.h
+  src/mesh.h
+  src/object.h
+  src/renderer.h
+  src/texture.h
+  src/utils.h
+  src/vec2.h
+  src/vec3.h
+  src/vec4.h
+  src/vertex.h
+  src/world.h
+  src/shaders/gouraud_shader.h
+  src/shaders/shader.h
 )
 
 # Find the OS.
