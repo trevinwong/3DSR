@@ -20,6 +20,7 @@ class GouraudShader : public Shader
             // TODO: pass in t,b,l,r,n,f for perspective
             // TODO: do actual clipping?
             vec4 model_coords = model * vertex.position;
+			vec4 model_normals = inverse(transpose(model)) * vertex.normal;
             vec4 clip_coords = perspective() * lookAt(world.get_eye(), world.get_look_at_pt()) * model_coords;
             vec4 ndcs = clip_coords / clip_coords.w; 
             vec4 viewport_coords = viewport(frame) * ndcs;
@@ -29,7 +30,7 @@ class GouraudShader : public Shader
 
 			// https://www.scratchapixel.com/lessons/3d-basic-rendering/rasterization-practical-implementation/perspective-correct-interpolation-vertex-attributes
 			// we must divide vertex attributes by z first before linearly interpolating
-			intensities[num_vert] = dot(vec3(vertex.normal).normalize(), world.get_light().normalize()) / viewport_coords.w;
+			intensities[num_vert] = dot(vec3(model_normals).normalize(), world.get_light().normalize()) / viewport_coords.w;
 
             return viewport_coords;
         }
