@@ -16,6 +16,7 @@
 #include "world.h"
 #include "renderer.h"
 #include "shaders/gouraud_shader.h"
+#include "shaders/phong_shader.h"
 
 #define trace(var)  { std::cout << "Line " << __LINE__ << ": " << #var << "=" << var << "\n";}
 #include "SDL.h"
@@ -57,7 +58,7 @@ int main(int argc, char * argv[]) {
     World world;
     world.addObject(&head);
 
-    GouraudShader shader(world, frame);
+    PhongShader shader(world, frame);
     
     Renderer framebuffer_renderer(world, frame, shader);
 

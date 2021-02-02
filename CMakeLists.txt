@@ -33,6 +33,7 @@ set(SOURCE_FILES
   src/vertex.h
   src/world.h
   src/shaders/gouraud_shader.h
+  src/shaders/phong_shader.h
   src/shaders/shader.h
 )
 
