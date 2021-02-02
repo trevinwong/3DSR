@@ -10,64 +10,6 @@ Renderer::Renderer(World& w, Frame& f, Shader& s) :
 {
 }
 
-void Renderer::draw_triangle_new(std::vector<vec4> coords)
-{
-    std::vector<vec2> screen_coords;
-    screen_coords.push_back(vec2(coords[0]));
-    screen_coords.push_back(vec2(coords[1]));
-    screen_coords.push_back(vec2(coords[2]));
-
-    vec2 edge0 = (screen_coords[1] - screen_coords[0]);
-    vec2 edge1 = (screen_coords[2] - screen_coords[1]);
-    vec2 edge2 = (screen_coords[0] - screen_coords[2]);
-
-    int min_x = std::max(min3(screen_coords[0].x, screen_coords[1].x, screen_coords[2].x), 0);
-    int max_x = std::min(max3(screen_coords[0].x, screen_coords[1].x, screen_coords[2].x), frame.w - 1);
-    int min_y = std::max(min3(screen_coords[0].y, screen_coords[1].y, screen_coords[2].y), 0);
-    int max_y = std::min(max3(screen_coords[0].y, screen_coords[1].y, screen_coords[2].y), frame.h - 1);
-
-    for (int i = min_x; i <= max_x; i++)
-    {
-        for (int j = min_y; j <= max_y; j++)
-        {
-            vec2 point(i,j);
-            vec2 v0_to_point = point - vec2(screen_coords[0]);
-            vec2 v1_to_point = point - vec2(screen_coords[1]);
-            vec2 v2_to_point = point - vec2(screen_coords[2]);
-
-            float v0v1p = cross(edge0, v0_to_point); 
-            float v1v2p = cross(edge1, v1_to_point); 
-            float v2v0p = cross(edge2, v2_to_point); 
-
-            if (v0v1p >= 0 && v1v2p >= 0 && v2v0p >= 0)
-            {
-                float v0v1v2 = cross(screen_coords[1] - screen_coords[0], screen_coords[2] - screen_coords[0]);
-                if (v0v1v2 == 0) return; // Discard degenerate triangles, whose area is 0.
-
-                float b1 = v1v2p / v0v1v2;
-                float b2 = v2v0p / v0v1v2;
-                float b3 = v0v1p / v0v1v2;
-
-                // Rational linear interpolation.
-                // https://www.scratchapixel.com/lessons/3d-basic-rendering/rasterization-practical-implementation/visibility-problem-depth-buffer-depth-interpolation
-                // Foundations of 3D Computer Graphics, Ch 13
-                // Remember that we store the z-value inside of our w
-                float wn_reciprocal = (b1 * (1.0f/coords[0].w)) + (b2 * (1.0f/coords[1].w)) + (b3 * (1.0f/coords[2].w));
-                float wn = (1.0f/wn_reciprocal);
-				vec4 barycentric(b1, b2, b3, wn);
-				uint32_t color;
-				bool discard = shader.fragment(barycentric, color);
-
-                if (!discard && wn < z_buffer[i + (j * frame.w)])
-                {
-                    z_buffer[i + (j * frame.w)] = wn;
-                    frame.set_pixel(i, j, color);
-                }
-            }
-        }
-    }
-}
-
 void Renderer::render()
 {
     frame.fill_frame_with_color(0xADD8E6);
@@ -94,18 +36,67 @@ void Renderer::render()
             // If -wn: vertices are CW, aka facing the back-side
             float backface = ((coords[2].x - coords[1].x) * (coords[0].y - coords[1].y)) -
                              ((coords[2].y - coords[1].y) * (coords[0].x - coords[1].x));
-            if (backface > 0) { draw_triangle_new(coords); }
+            if (backface > 0) { draw_triangle(coords); }
         }
     }
 }
 
-void Renderer::setup_zbuffer()
+void Renderer::draw_triangle(std::vector<vec4> coords)
 {
-    z_buffer = new float[frame.w * frame.h];
-    for (int i = 0; i < frame.w * frame.h; i++)
-    {
-            z_buffer[i] = std::numeric_limits<float>::max();
-    }
+	std::vector<vec2> screen_coords;
+	screen_coords.push_back(vec2(coords[0]));
+	screen_coords.push_back(vec2(coords[1]));
+	screen_coords.push_back(vec2(coords[2]));
+
+	vec2 edge0 = (screen_coords[1] - screen_coords[0]);
+	vec2 edge1 = (screen_coords[2] - screen_coords[1]);
+	vec2 edge2 = (screen_coords[0] - screen_coords[2]);
+
+	int min_x = std::max(min3(screen_coords[0].x, screen_coords[1].x, screen_coords[2].x), 0);
+	int max_x = std::min(max3(screen_coords[0].x, screen_coords[1].x, screen_coords[2].x), frame.w - 1);
+	int min_y = std::max(min3(screen_coords[0].y, screen_coords[1].y, screen_coords[2].y), 0);
+	int max_y = std::min(max3(screen_coords[0].y, screen_coords[1].y, screen_coords[2].y), frame.h - 1);
+
+	for (int i = min_x; i <= max_x; i++)
+	{
+		for (int j = min_y; j <= max_y; j++)
+		{
+			vec2 point(i, j);
+			vec2 v0_to_point = point - vec2(screen_coords[0]);
+			vec2 v1_to_point = point - vec2(screen_coords[1]);
+			vec2 v2_to_point = point - vec2(screen_coords[2]);
+
+			float v0v1p = cross(edge0, v0_to_point);
+			float v1v2p = cross(edge1, v1_to_point);
+			float v2v0p = cross(edge2, v2_to_point);
+
+			if (v0v1p >= 0 && v1v2p >= 0 && v2v0p >= 0)
+			{
+				float v0v1v2 = cross(screen_coords[1] - screen_coords[0], screen_coords[2] - screen_coords[0]);
+				if (v0v1v2 == 0) return; // Discard degenerate triangles, whose area is 0.
+
+				float b1 = v1v2p / v0v1v2;
+				float b2 = v2v0p / v0v1v2;
+				float b3 = v0v1p / v0v1v2;
+
+				// Rational linear interpolation.
+				// https://www.scratchapixel.com/lessons/3d-basic-rendering/rasterization-practical-implementation/visibility-problem-depth-buffer-depth-interpolation
+				// Foundations of 3D Computer Graphics, Ch 13
+				// Remember that we store the z-value inside of our w
+				float wn_reciprocal = (b1 * (1.0f / coords[0].w)) + (b2 * (1.0f / coords[1].w)) + (b3 * (1.0f / coords[2].w));
+				float wn = (1.0f / wn_reciprocal);
+				vec4 barycentric(b1, b2, b3, wn);
+				uint32_t color;
+				bool discard = shader.fragment(barycentric, color);
+
+				if (!discard && wn < z_buffer[i + (j * frame.w)])
+				{
+					z_buffer[i + (j * frame.w)] = wn;
+					frame.set_pixel(i, j, color);
+				}
+			}
+		}
+	}
 }
 
 void Renderer::draw_wireframe_triangle(std::vector<vec4> coords)
@@ -168,4 +159,13 @@ void Renderer::draw_line(int x0, int y0, int x1, int y1)
             ++x;
         }
     }
+}
+
+void Renderer::setup_zbuffer()
+{
+	z_buffer = new float[frame.w * frame.h];
+	for (int i = 0; i < frame.w * frame.h; i++)
+	{
+		z_buffer[i] = std::numeric_limits<float>::max();
+	}
 }

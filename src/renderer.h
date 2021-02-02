@@ -17,9 +17,9 @@ class Renderer
         void render();
 
     private:
+		void draw_triangle(std::vector<vec4> coords);
         void draw_wireframe_triangle(std::vector<vec4> coords);
         void draw_line(int x0, int y0, int x1, int y1);
-        void draw_triangle_new(std::vector<vec4> coords);
         void setup_zbuffer();
         
         World& world;
