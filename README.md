@@ -1,12 +1,12 @@
 # What?
 
-**3DSR** (short for 3D Software Rasterizer) is intended to be, as the title implies, a renderer that uses the rasterization technique, completely implemented in C++.
+**3DSR** (short for 3D Software Rasterizer) is a simple renderer that uses the rasterization technique, completely implemented in C++.
 
 ## Libraries
 
 - **tinyobjloader**
 - **SDL**
-To set up a window and view the results of the rendering in real-time. None of the visuals drawn to the screen will use SDL's functions for drawing to the screen.
+To set up a window and view the results of the rendering in real-time. None of the visuals drawn to the screen use SDL's functions for drawing to the screen.
 
 
 ## Building and Running (Linux)
@@ -18,14 +18,6 @@ In the cloned repo:
 - `make`
 
 Finally, use `./3DSR` in the `build` folder to run it.
-
-## Wishlist
-
-- Frustum culling
-- Frustum clipping and primitive reconstruction
-- Mipmaps
-- Shadow mapping
-- FPS
 
 ## Lessons
 
