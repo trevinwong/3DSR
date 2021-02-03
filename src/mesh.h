@@ -23,7 +23,7 @@ class Mesh
         Mesh(std::string_view path, std::shared_ptr<Texture>& t);
 
         void setTexture(std::shared_ptr<Texture>& t);
-        const std::shared_ptr<Texture>& getTexture() const; 
+		std::shared_ptr<Texture> getTexture() const;
 
         void setFaces(std::vector<Face>& f);
         // TODO: Make const, with refactor of rasterizer

@@ -1,13 +1,14 @@
 #pragma once
 #include "shader.h"
 #include "graphics.h"
+#include "vec2.h"
 #include <vector>
 
 class PhongShader : public Shader
 {
 public:
 	PhongShader(World& World, Frame& Frame) :
-		Shader(World, Frame), normals(3, vec3()), world_positions(3, vec3())
+		Shader(World, Frame), normals(3, vec3()), world_positions(3, vec3()), uvs(3, vec3())
 	{
 	}
 
@@ -32,6 +33,7 @@ public:
 		// we must divide vertex attributes by z first before linearly interpolating
 		normals[num_vert] = model_normals / viewport_coords.w;
 		world_positions[num_vert] = vertex.position / viewport_coords.w;
+		uvs[num_vert] = vertex.uv / viewport_coords.w;
 
 		return viewport_coords;
 	}
@@ -40,6 +42,7 @@ public:
 	{
 		vec3 normal = (((normals[0] * barycentric.x) + (normals[1] * barycentric.y) + (normals[2] * barycentric.z)) * barycentric.w).normalize();
 		vec3 world_position = ((world_positions[0] * barycentric.x) + (world_positions[1] * barycentric.y) + (world_positions[2] * barycentric.z)) * barycentric.w;
+		vec2 uv = ((uvs[0] * barycentric.x) + (uvs[1] * barycentric.y) + (uvs[2] * barycentric.z)) * barycentric.w;
 
 		vec3 to_eye = (world.get_eye() - world_position).normalize();
 		vec3 to_light = (world.get_light() - world_position).normalize();
@@ -56,12 +59,25 @@ public:
 		float ks = 0.4f;
 
 		float phong_term = ka + (kd * diffuse) + (ks * specular);
-		float rgb = phong_term * 255;
 
-		color = SDL_MapRGBA(frame.pixel_format, rgb, rgb, rgb, 255);
+		float r = 255.0f, g = 255.0f, b = 255.0f;
+        if (texture != nullptr)
+        {
+            uint32_t u = (uint32_t) std::floor(uv.x * texture->width);
+            uint32_t v = (uint32_t) std::floor(uv.y * texture->height);
+
+            // NotCamelCase/SoftLit/Texture.cpp
+            int idx = ((v * texture->width) + u) * texture->channels;
+            r = (float) texture->data[idx++];
+            g = (float) texture->data[idx++];
+            b = (float) texture->data[idx++];
+        }
+
+		color = SDL_MapRGBA(frame.pixel_format, r * phong_term, g * phong_term, b * phong_term, 255);
 		return false;
 	}
 private:
 	std::vector<vec3> normals;
 	std::vector<vec3> world_positions;
+	std::vector<vec2> uvs;
 };

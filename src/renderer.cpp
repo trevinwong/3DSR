@@ -19,6 +19,7 @@ void Renderer::render()
     {
         std::shared_ptr<Mesh>& mesh = object->getMesh();
         mat4 model = *object->getMat();
+		shader.set_texture(mesh->getTexture());
 
         for (Face& face : mesh->getFaces())
         {

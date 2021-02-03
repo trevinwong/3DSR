@@ -74,7 +74,7 @@ void Mesh::setTexture(std::shared_ptr<Texture>& t)
     texture = t;
 }
 
-const std::shared_ptr<Texture>& Mesh::getTexture() const
+std::shared_ptr<Texture> Mesh::getTexture() const
 {
     return texture;
 }
